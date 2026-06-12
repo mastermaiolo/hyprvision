@@ -1,0 +1,15 @@
+name        = "Cinema OLED"
+icon        = "🌌"
+description = "Pretos profundos estilo OLED e cores vibrantes. Filmes e jogos num LCD."
+intensity   = "strong"
+category    = "experience"
+
+[gamma]
+# Backlight a 100% e cor neutra: o contraste vem do shader
+# (esmagar pretos com brightness reduzido mataria os realces)
+temperature = 6500
+brightness  = 1.0
+gamma       = 1.0
+
+[shader]
+file = "cinema_oled.glsl"

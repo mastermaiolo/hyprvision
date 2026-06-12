@@ -1,0 +1,11 @@
+name        = "Paper Soft"
+icon        = "🌿"
+description = "Paper ainda mais quente e suave. Sessões longas de escrita e leitura."
+intensity   = "medium"
+category    = "experience"
+[gamma]
+temperature = 4800
+brightness  = 0.88
+gamma       = 1.04
+[shader]
+file = "paper_soft.glsl"

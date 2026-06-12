@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""HyprVision v4 — CLI principal."""
+import argparse
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from core import daemonctl
+from core.apply  import ApplyPipeline
+from core.config import load as load_config, ensure_full_config, CONFIG_PATH
+from core.profile import ProfileLoader
+from core.shader import PAPER_INTENSITY
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def _apply_keybinds_live(keybinds: dict) -> bool:
+    """
+    Aplica keybinds imediatamente ao Hyprland em runtime via hyprctl eval
+    (que executa Lua no compositor, sem precisar reiniciar).
+    Só funciona dentro de sessão Hyprland.
+    """
+    if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return False
+
+    action_cmds = {
+        "menu": f"{BASE_DIR}/ui/launcher.sh",
+    }
+
+    lua_lines = []
+    for action_id, entry in keybinds.items():
+        cmd = action_cmds.get(action_id)
+        if not cmd:
+            continue
+        combo = " + ".join(entry.mods.split() + [entry.key])
+        lua_lines.append(f'hl.bind("{combo}", hl.dsp.exec_cmd("{cmd}"))')
+
+    if not lua_lines:
+        return False
+
+    try:
+        r = subprocess.run(
+            ["hyprctl", "eval", "; ".join(lua_lines)],
+            capture_output=True, text=True, timeout=3
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _exit(ok: bool) -> None:
+    sys.exit(0 if ok else 1)
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="HyprVision v4 — Gestor Modular de Ergonomia Visual",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+
+    p.add_argument("--apply",        metavar="ID",   help="Aplica um perfil pelo ID")
+    p.add_argument("--apply-extra",  metavar="FILE",
+                   help="Aplica um shader extra (nome em shaders/extras ou path)")
+    p.add_argument("--safe-reset",   action="store_true", help="Reset de emergência")
+    p.add_argument("--restore",      action="store_true", help="Restaura estado após reinício")
+    p.add_argument("--status",       action="store_true", help="Mostra estado actual")
+    p.add_argument("--list-rofi",    action="store_true", help="Lista perfis para Rofi/Fuzzel")
+
+    # Daemon
+    p.add_argument("--daemon-start",  action="store_true", help="Arranca o daemon")
+    p.add_argument("--daemon-stop",   action="store_true", help="Pára o daemon")
+    p.add_argument("--reload-daemon", action="store_true",
+                   help="Envia SIGHUP ao daemon para reler daemon_config.toml")
+    p.add_argument("--init-config",   action="store_true",
+                   help="Cria/completa o daemon_config.toml com todas as opções")
+
+    # Overlays
+    p.add_argument("--paper-texture", metavar="LEVEL",
+                   choices=list(PAPER_INTENSITY.keys()),
+                   help="Overlay de textura de papel (off|light|medium|heavy)")
+    p.add_argument("--dim", metavar="N", type=int,
+                   choices=[0, 10, 20, 30, 40, 50],
+                   help="Extra Dim em %% (0=desligado)")
+
+    args = p.parse_args()
+    pipeline = ApplyPipeline(BASE_DIR)
+
+    # ── Daemon ─────────────────────────────────────────────────────────
+    if args.daemon_start:
+        pid = daemonctl.start(BASE_DIR)
+        if pid:
+            print(f"[HyprVision] Daemon a correr (PID {pid}).")
+        else:
+            print("[HyprVision] Falha ao arrancar o daemon.", file=sys.stderr)
+        _exit(pid is not None)
+
+    if args.daemon_stop:
+        ok = daemonctl.stop(BASE_DIR)
+        print("[HyprVision] Daemon parado." if ok
+              else "[HyprVision] Daemon não respondeu ao SIGTERM.")
+        _exit(ok)
+
+    if args.reload_daemon:
+        if not daemonctl.reload(BASE_DIR):
+            print("[HyprVision] Daemon não está a correr.")
+            _exit(False)
+        print("[HyprVision] SIGHUP enviado ao daemon.")
+        # Também aplica keybinds actualizados ao Hyprland em live
+        cfg = load_config()
+        if cfg.keybinds:
+            if _apply_keybinds_live(cfg.keybinds):
+                print("[HyprVision] Keybinds actualizados no Hyprland.")
+            else:
+                print("[HyprVision] Keybinds actualizados no próximo reinício.")
+        _exit(True)
+
+    if args.init_config:
+        created = ensure_full_config()
+        print(f"[HyprVision] Config {'criada/completada' if created else 'já completa'}: "
+              f"{CONFIG_PATH}")
+        _exit(True)
+
+    # ── Acções principais ──────────────────────────────────────────────
+    if args.safe_reset:
+        _exit(pipeline.safe_reset())
+
+    if args.restore:
+        _exit(pipeline.restore())
+
+    if args.status:
+        state = pipeline.state_mgr.read_state()
+        print(f"Perfil     : {state.active_profile}")
+        print(f"Temperatura: {state.temperature}K")
+        print(f"Brightness : {state.brightness}")
+        print(f"Gamma      : {state.gamma}")
+        print(f"Shader     : {state.shader or '(nenhum)'}")
+        print(f"Extra      : {os.path.basename(state.extra_shader) or '(nenhum)'}")
+        print(f"ICC        : {state.icc or '(nenhum)'}")
+        print(f"Paper Tex  : {state.overlay.paper_texture}")
+        print(f"Dim        : {state.overlay.dim_level}%")
+        pid = daemonctl.running_pid(BASE_DIR)
+        print(f"Daemon     : {'a correr (PID ' + str(pid) + ')' if pid else 'parado'}")
+        print(f"Config     : {CONFIG_PATH}")
+        sys.exit(0)
+
+    if args.list_rofi:
+        loader   = ProfileLoader(os.path.join(BASE_DIR, "profiles"))
+        profiles = loader.load_all_profiles()
+        order    = {"correction": 0, "experience": 1, "system": 2}
+        profiles.sort(key=lambda pr: (order.get(pr.category, 9), pr.name))
+
+        state = pipeline.state_mgr.read_state()
+
+        last_cat = None
+        for pr in profiles:
+            if pr.category != last_cat:
+                cat_label = {
+                    "correction": "── 🔧 CORRECTION ──",
+                    "experience": "── 🎭 EXPERIENCE ──",
+                    "system":     "── ⚙️  SYSTEM ──",
+                }.get(pr.category, f"── {pr.category.upper()} ──")
+                print(cat_label)
+                last_cat = pr.category
+            mark = "  ✓" if (state.active_profile == pr.id
+                             and not state.extra_shader) else ""
+            print(f"{pr.icon} {pr.name}{mark}   [{pr.id}]")
+
+        print("── 📄 PAPER TEXTURE ──")
+        for lvl in ("light", "medium", "heavy", "off"):
+            mark = "  ✓" if state.overlay.paper_texture == lvl else ""
+            print(f"📄 Paper Texture: {lvl}{mark}   [paper_tex_{lvl}]")
+
+        print("── 💡 EXTRA DIM ──")
+        for lvl in (10, 20, 30, 40, 50):
+            mark = "  ✓" if state.overlay.dim_level == lvl else ""
+            print(f"🔅 Dim {lvl}%{mark}   [dim_{lvl}]")
+        doff = "  ✓" if state.overlay.dim_level == 0 else ""
+        print(f"🔅 Dim Off{doff}   [dim_0]")
+
+        print("── 🌐 EXTRAS ──")
+        extra_label = ""
+        if state.extra_shader:
+            extra_label = f"  ✓ {os.path.basename(state.extra_shader)}"
+        print(f"🌐 Extras (comunidade){extra_label}   [__extras__]")
+
+        print("── ⚙️  DAEMON ──")
+        pid = daemonctl.running_pid(BASE_DIR)
+        if pid:
+            print(f"⚙️  Daemon: a correr (PID {pid})   [__daemon_status__]")
+            print(f"🔄 Recarregar config daemon   [__daemon_reload__]")
+            print(f"🛑 Parar daemon   [__daemon_stop__]")
+        else:
+            print(f"⚙️  Daemon: parado   [__daemon_status__]")
+            print(f"▶️  Iniciar daemon   [__daemon_start__]")
+        print(f"📝 Editar configuração (TOML)   [__daemon_config__]")
+        sys.exit(0)
+
+    if args.apply:
+        _exit(pipeline.apply_profile(args.apply))
+
+    if args.apply_extra:
+        _exit(pipeline.apply_extra(args.apply_extra))
+
+    if args.paper_texture is not None or args.dim is not None:
+        _exit(pipeline.set_overlay(
+            paper_texture = args.paper_texture,
+            dim_level     = args.dim,
+        ))
+
+    p.print_help()
+
+
+if __name__ == "__main__":
+    main()

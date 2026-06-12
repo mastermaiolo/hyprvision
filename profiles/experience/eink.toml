@@ -1,0 +1,11 @@
+name        = "E-Ink"
+icon        = "📖"
+description = "Preto e branco com warm tint. Transforma o ecrã num Kindle para leitura longa."
+intensity   = "high"
+category    = "experience"
+[gamma]
+temperature = 4200
+brightness  = 0.90
+gamma       = 1.06
+[shader]
+file = "eink.glsl"

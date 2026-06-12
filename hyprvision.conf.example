@@ -1,0 +1,11 @@
+# ── HyprVision v4 ──────────────────────────────────────────
+# Gerado pelo install.sh — @INSTALL@ é substituído pelo caminho real
+exec-once = @INSTALL@/bin/hyprvision --restore
+exec-once = @INSTALL@/bin/hyprvision-daemon
+# ── /HyprVision v4 ────────────────────────────────────────
+
+# ── HyprVision v4 keybind ──────────────────────────────────────
+bind = SUPER, H, exec, @INSTALL@/ui/launcher.sh
+# Reset de emergência — repõe o ecrã neutro se um perfil correr mal
+bind = SUPER SHIFT, H, exec, @INSTALL@/bin/hyprvision --safe-reset
+# ── /HyprVision v4 keybind ────────────────────────────────────

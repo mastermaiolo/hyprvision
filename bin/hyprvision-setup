@@ -1,0 +1,540 @@
+#!/usr/bin/env python3
+"""
+HyprVision v4 · Wizard de primeira execução
+Lê os keybinds actuais do Hyprland via `hyprctl binds -j`,
+detecta combinações livres e apresenta um picker ao utilizador.
+
+Backends de UI (em ordem de preferência):
+  1. zenity  — GTK nativo, bonito
+  2. rofi    — já é dependência do HyprVision
+  3. terminal interactivo (fallback universal)
+"""
+import json
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# ── Constantes ────────────────────────────────────────────────────────
+SETUP_FLAG   = os.path.expanduser("~/.config/hypr/hyprvision/state/.setup_done")
+CONFIG_FILE  = os.path.expanduser("~/.config/hypr/hyprvision/daemon_config.toml")
+CONF_FILE    = os.path.expanduser("~/.config/hypr/hyprvision.conf")
+LUA_FILE     = os.path.expanduser("~/.config/hypr/hyprland.lua")
+INSTALL_DIR  = os.path.expanduser("~/.config/hypr/hyprvision")
+
+# Bitmask dos modificadores (formato hyprctl)
+MOD_BITS = {
+    "SHIFT": 1,
+    "CTRL":  4,
+    "ALT":   8,
+    "SUPER": 64,
+}
+
+# ── Acções do HyprVision a associar a keybinds ────────────────────────
+ACTIONS = [
+    {
+        "id":      "menu",
+        "label":   "Menu principal",
+        "desc":    "Abre o menu de perfis visuais (Extra Dim, Paper Texture e perfis)",
+        "cmd":     f"{INSTALL_DIR}/ui/launcher.sh",
+        "default": ("SUPER", "F9"),
+        "suggestions": [
+            ("SUPER",       "F9"),
+            ("SUPER",       "F8"),
+            ("SUPER",       "F7"),
+            ("SUPER ALT",   "V"),
+            ("SUPER SHIFT", "V"),
+            ("SUPER CTRL",  "F9"),
+        ],
+    },
+]
+
+
+# ── Leitura dos keybinds actuais ─────────────────────────────────────
+
+def read_occupied_binds() -> set[tuple[str, str]]:
+    """
+    Lê `hyprctl binds -j` e devolve um set de (mods_str, key_upper).
+    mods_str: ex. "SUPER", "SUPER SHIFT", "SUPER CTRL ALT"
+    """
+    occupied = set()
+    try:
+        out = subprocess.run(
+            ["hyprctl", "binds", "-j"],
+            capture_output=True, text=True, timeout=3
+        )
+        if out.returncode != 0:
+            return occupied
+        binds = json.loads(out.stdout)
+        for b in binds:
+            mask = b.get("modmask", 0)
+            key  = b.get("key", "").upper().strip()
+            if not key:
+                continue
+            mods = sorted(
+                [name for name, bit in MOD_BITS.items() if mask & bit],
+                key=lambda m: ["SUPER","SHIFT","CTRL","ALT"].index(m) if m in ["SUPER","SHIFT","CTRL","ALT"] else 99
+            )
+            occupied.add((" ".join(mods), key))
+    except (FileNotFoundError, json.JSONDecodeError, subprocess.TimeoutExpired):
+        pass
+    return occupied
+
+
+def is_free(mods: str, key: str, occupied: set) -> bool:
+    """Normaliza e verifica se uma combinação está livre."""
+    mods_norm = " ".join(sorted(
+        mods.upper().split(),
+        key=lambda m: ["SUPER","SHIFT","CTRL","ALT"].index(m) if m in ["SUPER","SHIFT","CTRL","ALT"] else 99
+    ))
+    return (mods_norm, key.upper()) not in occupied
+
+
+def find_free_suggestions(action: dict, occupied: set) -> list[tuple[str, str]]:
+    """Devolve sugestões da lista do action que estejam livres."""
+    free = []
+    for mods, key in action["suggestions"]:
+        if is_free(mods, key, occupied):
+            free.append((mods, key))
+    return free
+
+
+# ── Formatação para output ────────────────────────────────────────────
+
+def fmt_bind(mods: str, key: str) -> str:
+    """Ex: ('SUPER SHIFT', 'V') → 'Super + Shift + V'"""
+    parts = [m.capitalize() for m in mods.split()] + [key]
+    return " + ".join(parts)
+
+
+def fmt_hyprconf(mods: str, key: str, cmd: str) -> str:
+    """Linha para hyprland.conf: bind = SUPER SHIFT, V, exec, cmd"""
+    mod_str = " ".join(m for m in mods.split())
+    return f"bind = {mod_str}, {key}, exec, {cmd}"
+
+
+def fmt_lua(mods: str, key: str, cmd: str) -> str:
+    """Linha para hyprland.lua: hl.bind('SUPER + SHIFT + V', hl.dsp.exec_cmd('cmd'))"""
+    parts = mods.split() + [key]
+    combo = " + ".join(parts)
+    return f'hl.bind("{combo}", hl.dsp.exec_cmd("{cmd}"))'
+
+
+# ── Backends de UI ────────────────────────────────────────────────────
+
+def has_cmd(cmd: str) -> bool:
+    return subprocess.run(["which", cmd], capture_output=True).returncode == 0
+
+
+def pick_with_zenity(action: dict, occupied: set) -> tuple[str, str] | None:
+    """Picker GTK via zenity --list."""
+    free_suggestions = find_free_suggestions(action, occupied)
+
+    rows = []
+    for mods, key in free_suggestions:
+        status = "✓ livre"
+        rows += [fmt_bind(mods, key), status, mods, key]
+
+    # Adiciona opção de custom no fim
+    rows += ["⌨  Outra combinação...", "personalizada", "__custom__", "__custom__"]
+
+    try:
+        result = subprocess.run(
+            [
+                "zenity", "--list",
+                "--title", f"HyprVision — {action['label']}",
+                "--text",  f"<b>{action['desc']}</b>\n\nEscolhe um atalho de teclado:",
+                "--column", "Combinação",
+                "--column", "Estado",
+                "--column", "mods",
+                "--column", "key",
+                "--hide-column", "3,4",
+                "--width", "440",
+                "--height", "320",
+                "--print-column", "3,4",
+                "--separator", "|||",
+            ] + rows,
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return None
+        parts = result.stdout.strip().split("|||")
+        if len(parts) < 2:
+            return None
+        mods, key = parts[0], parts[1]
+        if mods == "__custom__":
+            return pick_custom_zenity(action, occupied)
+        return (mods, key)
+    except FileNotFoundError:
+        return None
+
+
+def pick_custom_zenity(action: dict, occupied: set) -> tuple[str, str] | None:
+    """Permite ao utilizador escrever uma combinação custom."""
+    while True:
+        result = subprocess.run(
+            [
+                "zenity", "--entry",
+                "--title", "Combinação personalizada",
+                "--text",  (
+                    "Escreve a combinação no formato:\n"
+                    "  SUPER F12\n  SUPER SHIFT Q\n  SUPER CTRL ALT X\n\n"
+                    "Modificadores válidos: SUPER, SHIFT, CTRL, ALT\n"
+                    "Teclas: F1-F12, letras (A-Z), números (0-9)"
+                ),
+                "--entry-text", "SUPER ",
+            ],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return None
+
+        raw = result.stdout.strip().upper().split()
+        if len(raw) < 2:
+            _zenity_error("Formato inválido. Exemplo: SUPER F9")
+            continue
+
+        key  = raw[-1]
+        mods = " ".join(raw[:-1])
+
+        valid_mods = {"SUPER", "SHIFT", "CTRL", "ALT"}
+        bad_mods = [m for m in mods.split() if m not in valid_mods]
+        if bad_mods:
+            _zenity_error(f"Modificadores inválidos: {', '.join(bad_mods)}\nUsa: SUPER, SHIFT, CTRL, ALT")
+            continue
+
+        if not is_free(mods, key, occupied):
+            _zenity_error(
+                f"⚠️  {fmt_bind(mods, key)} já está ocupado!\n"
+                "Escolhe uma combinação diferente."
+            )
+            continue
+
+        return (mods, key)
+
+
+def _zenity_error(msg: str) -> None:
+    subprocess.run(
+        ["zenity", "--error", "--text", msg, "--width", "360"],
+        capture_output=True
+    )
+
+
+def pick_with_rofi(action: dict, occupied: set) -> tuple[str, str] | None:
+    """Picker via rofi -dmenu."""
+    free_suggestions = find_free_suggestions(action, occupied)
+    lines = []
+    mapping = {}
+
+    for mods, key in free_suggestions:
+        label = f"{fmt_bind(mods, key)}   ✓ livre"
+        lines.append(label)
+        mapping[label.split("   ")[0].strip()] = (mods, key)
+
+    lines.append("⌨  Outra combinação...")
+
+    proc = subprocess.run(
+        ["rofi", "-dmenu", "-p", f"HyprVision · {action['label']}", "-format", "s"],
+        input="\n".join(lines), capture_output=True, text=True
+    )
+    if proc.returncode != 0:
+        return None
+
+    choice = proc.stdout.strip().split("   ")[0].strip()
+    if "Outra combinação" in choice:
+        return pick_custom_terminal(action, occupied)
+    return mapping.get(choice)
+
+
+def pick_terminal(action: dict, occupied: set) -> tuple[str, str] | None:
+    """Fallback: picker interactivo no terminal."""
+    free_suggestions = find_free_suggestions(action, occupied)
+
+    print(f"\n{'─'*52}")
+    print(f"  HyprVision · {action['label']}")
+    print(f"  {action['desc']}")
+    print(f"{'─'*52}")
+    print()
+
+    options = []
+    for i, (mods, key) in enumerate(free_suggestions, 1):
+        print(f"  [{i}] {fmt_bind(mods, key)}   ✓ livre")
+        options.append((mods, key))
+
+    print(f"  [{len(options)+1}] Outra combinação...")
+    print(f"  [0] Manter padrão ({fmt_bind(*action['default'])})")
+    print()
+
+    while True:
+        try:
+            raw = input("  Escolha: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
+
+        if raw == "0":
+            return action["default"]
+        try:
+            n = int(raw)
+        except ValueError:
+            print("  Inválido.")
+            continue
+
+        if 1 <= n <= len(options):
+            return options[n-1]
+        if n == len(options) + 1:
+            return pick_custom_terminal(action, occupied)
+        print("  Fora de intervalo.")
+
+
+def pick_custom_terminal(action: dict, occupied: set) -> tuple[str, str] | None:
+    """Entrada custom no terminal."""
+    print()
+    print("  Formato: SUPER F9 / SUPER SHIFT Q / SUPER CTRL ALT X")
+    print("  Modificadores: SUPER, SHIFT, CTRL, ALT")
+
+    while True:
+        try:
+            raw = input("  Combinação: ").strip().upper().split()
+        except (EOFError, KeyboardInterrupt):
+            return None
+
+        if len(raw) < 2:
+            print("  Formato inválido.")
+            continue
+
+        key  = raw[-1]
+        mods = " ".join(raw[:-1])
+        valid = {"SUPER", "SHIFT", "CTRL", "ALT"}
+        bad   = [m for m in mods.split() if m not in valid]
+
+        if bad:
+            print(f"  Modificadores inválidos: {', '.join(bad)}")
+            continue
+
+        if not is_free(mods, key, occupied):
+            print(f"  ⚠  {fmt_bind(mods, key)} já está ocupado! Escolhe outro.")
+            continue
+
+        return (mods, key)
+
+
+def pick(action: dict, occupied: set) -> tuple[str, str]:
+    """Escolhe o melhor backend e devolve a combinação seleccionada."""
+    result = None
+    if has_cmd("zenity"):
+        result = pick_with_zenity(action, occupied)
+    elif has_cmd("rofi"):
+        result = pick_with_rofi(action, occupied)
+
+    if result is None:
+        result = pick_terminal(action, occupied)
+
+    if result is None:
+        # Utilizador cancelou — usa o default
+        result = action["default"]
+
+    return result
+
+
+# ── Escrita da configuração ──────────────────────────────────────────
+
+def write_config(binds: dict[str, tuple[str, str]]) -> None:
+    """
+    Escreve / actualiza as secções [keybinds] do daemon_config.toml
+    e adiciona os binds ao hyprland.conf ou hyprland.lua.
+    """
+    # daemon_config.toml
+    os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+    existing = ""
+    if os.path.isfile(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            existing = f.read()
+
+    # Remove secção [keybinds] antiga se existir
+    lines = existing.splitlines()
+    new_lines = []
+    in_keybinds = False
+    for line in lines:
+        if line.strip() == "[keybinds]":
+            in_keybinds = True
+            continue
+        if in_keybinds and line.startswith("[") and line.strip() != "[keybinds]":
+            in_keybinds = False
+        if not in_keybinds:
+            new_lines.append(line)
+
+    new_lines.append("")
+    new_lines.append("[keybinds]")
+    for action in ACTIONS:
+        mods, key = binds[action["id"]]
+        new_lines.append(f'{action["id"]:20s} = {{ mods = "{mods}", key = "{key}" }}')
+
+    with open(CONFIG_FILE, "w") as f:
+        f.write("\n".join(new_lines) + "\n")
+
+    # Hyprland config
+    use_lua = os.path.isfile(LUA_FILE)
+
+    bind_lines = []
+    for action in ACTIONS:
+        mods, key = binds[action["id"]]
+        if use_lua:
+            bind_lines.append(fmt_lua(mods, key, action["cmd"]))
+        else:
+            bind_lines.append(fmt_hyprconf(mods, key, action["cmd"]))
+
+    if use_lua:
+        # Injeta / substitui bloco HyprVision no hyprland.lua
+        _update_lua(bind_lines)
+    else:
+        # Escreve / substitui no hyprvision.conf
+        _update_conf(bind_lines)
+
+    # Aplica keybinds imediatamente ao Hyprland (sem reinício)
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        lua_parts = []
+        for action in ACTIONS:
+            mods, key = binds[action["id"]]
+            parts = mods.split() + [key]
+            combo = " + ".join(parts)
+            cmd = action["cmd"]
+            lua_parts.append(f'hl.bind("{combo}", hl.dsp.exec_cmd("{cmd}"))')
+        lua_code = "; ".join(lua_parts)
+        import subprocess as _sp
+        r = _sp.run(["hyprctl", "eval", lua_code],
+                    capture_output=True, text=True, timeout=3)
+        if r.returncode == 0:
+            print("  ✓ Atalhos activos imediatamente (sem reinício).")
+        else:
+            print("  ⚠  Hyprland não respondeu ao eval — activa no próximo reinício.")
+
+    # Marca setup como concluído
+    os.makedirs(os.path.dirname(SETUP_FLAG), exist_ok=True)
+    open(SETUP_FLAG, "w").close()
+
+
+def _update_lua(bind_lines: list[str]) -> None:
+    if not os.path.isfile(LUA_FILE):
+        return
+    with open(LUA_FILE) as f:
+        content = f.read()
+
+    block = (
+        "-- ── HyprVision v4 keybind ────────────────────────────────────\n"
+        + "\n".join(bind_lines)
+        + "\n-- ── /HyprVision v4 keybind ──────────────────────────────────\n"
+    )
+
+    # Substitui bloco existente, ou apende
+    import re
+    pattern = r"-- ── HyprVision v4 keybind.*?-- ── /HyprVision v4 keybind[^\n]*\n?"
+    if re.search(pattern, content, re.DOTALL):
+        content = re.sub(pattern, block, content, flags=re.DOTALL)
+    else:
+        content += "\n" + block
+
+    with open(LUA_FILE, "w") as f:
+        f.write(content)
+
+
+def _update_conf(bind_lines: list[str]) -> None:
+    header   = "# ── HyprVision v4 keybind ──────────────────────────────────────"
+    footer   = "# ── /HyprVision v4 keybind ────────────────────────────────────"
+
+    existing = ""
+    if os.path.isfile(CONF_FILE):
+        with open(CONF_FILE) as f:
+            existing = f.read()
+
+    block = header + "\n" + "\n".join(bind_lines) + "\n" + footer + "\n"
+
+    import re
+    # Tem de casar com o cabeçalho/rodapé que este próprio script escreve —
+    # caso contrário cada execução apendava um bloco duplicado.
+    pattern = r"# ── HyprVision v4 keybind ─+\n.*?# ── /HyprVision v4 keybind ─+\n?"
+    if re.search(pattern, existing, re.DOTALL):
+        existing = re.sub(pattern, block, existing, flags=re.DOTALL)
+    else:
+        existing += "\n" + block
+
+    with open(CONF_FILE, "w") as f:
+        f.write(existing)
+
+
+# ── Entry point ──────────────────────────────────────────────────────
+
+def is_first_run() -> bool:
+    return not os.path.isfile(SETUP_FLAG)
+
+
+def run_wizard(force: bool = False) -> None:
+    if not force and not is_first_run():
+        return
+
+    print()
+    print("╔══════════════════════════════════════════════════╗")
+    print("║   HyprVision v4 · Configuração de Atalho         ║")
+    print("╚══════════════════════════════════════════════════╝")
+    print()
+    print("  A ler atalhos actuais do Hyprland...")
+
+    occupied = read_occupied_binds()
+    print(f"  {len(occupied)} atalhos ocupados detectados.")
+
+    # Avisa se não conseguiu ler (Hyprland não está a correr)
+    if not occupied:
+        print()
+        print("  ⚠  Não foi possível ler atalhos do Hyprland.")
+        print("     (Hyprland não está a correr ou hyprctl não encontrado)")
+        print("     As sugestões não verificam conflitos desta vez.")
+        print()
+
+    chosen: dict[str, tuple[str, str]] = {}
+
+    for action in ACTIONS:
+        result = pick(action, occupied)
+        chosen[action["id"]] = result
+        # Marca a combinação escolhida como ocupada para os próximos actions
+        mods_norm = " ".join(sorted(
+            result[0].upper().split(),
+            key=lambda m: ["SUPER","SHIFT","CTRL","ALT"].index(m)
+                          if m in ["SUPER","SHIFT","CTRL","ALT"] else 99
+        ))
+        occupied.add((mods_norm, result[1].upper()))
+
+    # Resumo antes de confirmar
+    print()
+    print("  ── Resumo ──────────────────────────────────────")
+    for action in ACTIONS:
+        mods, key = chosen[action["id"]]
+        print(f"  {action['label']:25s}  {fmt_bind(mods, key)}")
+    print()
+
+    # Confirmação (só no terminal; zenity/rofi já confirmam por escolha)
+    if not has_cmd("zenity") and not has_cmd("rofi"):
+        try:
+            ans = input("  Confirmar keybind? [S/n]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            ans = "n"
+        if ans == "n":
+            print("  Configuração cancelada.")
+            return
+
+    write_config(chosen)
+
+    print()
+    print("  ✓ Atalhos guardados em:")
+    print(f"    {CONFIG_FILE}")
+    if os.path.isfile(LUA_FILE):
+        print(f"    {LUA_FILE}  (bloco HyprVision actualizado)")
+    else:
+        print(f"    {CONF_FILE}")
+    print()
+    print("  Reinicia o Hyprland (Super+M → logout) para activar.")
+    print()
+
+
+if __name__ == "__main__":
+    force = "--force" in sys.argv or "-f" in sys.argv
+    run_wizard(force=force)

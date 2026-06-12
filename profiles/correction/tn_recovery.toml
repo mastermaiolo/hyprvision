@@ -1,0 +1,11 @@
+name        = "TN Recovery"
+icon        = "🖥️"
+description = "Levanta sombras e adiciona vibração selectiva. Ideal para painéis TN antigos e notebooks lavados."
+intensity   = "medium"
+category    = "correction"
+[gamma]
+temperature = 5800
+brightness  = 1.0
+gamma       = 1.12
+[shader]
+file = "tn_recovery.glsl"

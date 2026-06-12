@@ -1,0 +1,11 @@
+name        = "Night"
+icon        = "🌙"
+description = "Luz azul mínima. Preservação de melatonina antes de dormir."
+intensity   = "high"
+category    = "experience"
+[gamma]
+temperature = 3600
+brightness  = 0.80
+gamma       = 1.0
+[shader]
+file = "night.glsl"

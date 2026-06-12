@@ -1,0 +1,12 @@
+name        = "Reset"
+icon        = "⚡"
+description = "Limpa todos os shaders e overlays. Volta ao estado neutro."
+intensity   = "none"
+category    = "system"
+[gamma]
+temperature = 6500
+brightness  = 1.0
+gamma       = 1.0
+[shader]
+enabled = false
+file    = ""
