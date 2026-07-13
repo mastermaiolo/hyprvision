@@ -253,6 +253,38 @@ function T.test_tick_schedule_baseline()
            "primeiro tick não devia aplicar (apply_on_start=false)")
 end
 
+function T.test_launcher_smoke()
+    local sand = TMP .. "/launcher"
+    os.execute(("mkdir -p '%s/ui' '%s/state' '%s/rofi' '%s/fakebin'")
+               :format(sand, sand, sand, sand))
+    os.execute(("cp '%s/ui/launcher.sh' '%s/ui/'"):format(ROOT, sand))
+    os.execute(("touch '%s/rofi/hyprvision.rasi'"):format(sand))
+    -- estado e índice como o init os deixaria
+    local st = assert(io.open(sand .. "/state/state", "w"))
+    st:write("profile=reset\nshader=\nicc=\nextra=\npaper=off\ndim=0\n" ..
+             "temperature=6500\nbrightness=1.0\ngamma=1.0\n")
+    st:close()
+    local mi = assert(io.open(sand .. "/state/profiles.menu", "w"))
+    mi:write("night\t🌙\tNight\texperience\nreset\t⚡\tReset\tsystem\n")
+    mi:close()
+    -- fakes: rofi escolhe a linha night; hyprctl regista os evals
+    local fk = assert(io.open(sand .. "/fakebin/rofi", "w"))
+    fk:write("#!/usr/bin/env bash\ngrep -m1 night\n"); fk:close()
+    fk = assert(io.open(sand .. "/fakebin/hyprctl", "w"))
+    fk:write(("#!/usr/bin/env bash\necho \"$@\" >> '%s/hyprctl.log'\necho ok\n")
+             :format(sand)); fk:close()
+    fk = assert(io.open(sand .. "/fakebin/notify-send", "w"))
+    fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
+    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
+
+    local rc = os.execute(("PATH='%s/fakebin':$PATH bash '%s/ui/launcher.sh'")
+                          :format(sand, sand))
+    assert(rc, "launcher saiu com erro")
+    local log = assert(io.open(sand .. "/hyprctl.log")):read("*a")
+    assert(log:match("eval hv%.apply%('night'%)"),
+           "launcher devia invocar hv.apply('night'); log:\n" .. log)
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end
