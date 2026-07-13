@@ -142,6 +142,46 @@ function T.test_glsl_valido()
     print(("  (%d shaders GLSL validados)"):format(n))
 end
 
+function T.test_schedule_wrap()
+    local slots = {
+        { name = "dawn",  enabled = true, hour = 6,  profile = "reset" },
+        { name = "night", enabled = true, hour = 21, profile = "night" },
+        { name = "off",   enabled = false, hour = 12, profile = "focus" },
+        { name = "none",  enabled = true, hour = 13, profile = "none" },
+    }
+    local function at(h, m) return core.current_slot(slots, h * 60 + m) end
+    assert(at(7, 0).name  == "dawn",  "07:00 devia ser dawn")
+    assert(at(22, 0).name == "night", "22:00 devia ser night")
+    assert(at(2, 0).name  == "night", "02:00 devia herdar night de ontem (wrap)")
+    assert(at(12, 30).name == "dawn", "slot disabled/none não conta")
+    assert(core.current_slot({}, 600) == nil, "sem slots → nil")
+    -- minutos contam
+    local ms = { { name = "m", enabled = true, hour = 6, minute = 30, profile = "reset" } }
+    assert(core.current_slot(ms, 6 * 60 + 15).name == "m", "wrap com minute")
+end
+
+function T.test_battery_transition()
+    local cfg = { enabled = true, threshold = 20, plugged = "none",
+                  unplugged = "none", low = "eink", restore_after_low = true }
+    -- baseline: primeira leitura nunca age
+    local p, act = core.battery_transition(cfg, nil, 15, "Discharging")
+    assert(p == "low" and act == nil, "baseline não devia agir")
+    -- entra em low
+    p, act = core.battery_transition(cfg, "unplugged", 15, "Discharging")
+    assert(p == "low" and act and act.apply == "eink" and act.remember,
+           "entrar em low devia aplicar eink")
+    -- sai de low ao ligar o carregador
+    p, act = core.battery_transition(cfg, "low", 15, "Charging")
+    assert(p == "plugged" and act and act.restore_pre_low,
+           "sair de low devia restaurar")
+    -- plugged/unplugged com "none" não agem
+    p, act = core.battery_transition(cfg, "plugged", 80, "Discharging")
+    assert(p == "unplugged" and act == nil, "'none' não devia agir")
+    -- sem mudança → sem acção
+    p, act = core.battery_transition(cfg, "unplugged", 60, "Discharging")
+    assert(act == nil, "sem transição não há acção")
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end

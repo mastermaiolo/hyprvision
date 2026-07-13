@@ -208,6 +208,54 @@ function M.compose(shader_abs, paper, dim)
     return path
 end
 
+-- ── Adaptativo (lógica pura, testável) ──────────────────────────────
+function M.current_slot(slots, now_min)
+    local best, best_t, latest, latest_t
+    for _, s in ipairs(slots or {}) do
+        if s.enabled and s.profile and s.profile ~= "none" then
+            local t = s.hour * 60 + (s.minute or 0)
+            if t <= now_min and (not best_t or t > best_t) then best, best_t = s, t end
+            if not latest_t or t > latest_t then latest, latest_t = s, t end
+        end
+    end
+    return best or latest   -- antes do 1º slot de hoje → último de ontem
+end
+
+function M.battery_transition(bcfg, prev, cap, status)
+    local power
+    if status ~= "Discharging" then power = "plugged"
+    elseif cap <= (bcfg.threshold or 20) then power = "low"
+    else power = "unplugged" end
+
+    if not bcfg.enabled or power == prev or prev == nil then
+        return power, nil
+    end
+    if power == "low" then
+        if bcfg.low and bcfg.low ~= "none" then
+            return power, { apply = bcfg.low, remember = true }
+        end
+    elseif prev == "low" and bcfg.restore_after_low then
+        return power, { restore_pre_low = true }
+    elseif bcfg[power] and bcfg[power] ~= "none" then
+        return power, { apply = bcfg[power] }
+    end
+    return power, nil
+end
+
+function M.read_battery()
+    for _, b in ipairs({ "BAT0", "BAT1", "BAT2" }) do
+        local f = io.open("/sys/class/power_supply/" .. b .. "/capacity")
+        if f then
+            local cap = tonumber(f:read("*l")); f:close()
+            local s = io.open("/sys/class/power_supply/" .. b .. "/status")
+            local status = s and s:read("*l") or "Unknown"
+            if s then s:close() end
+            return cap, status
+        end
+    end
+    return nil, "Unknown"
+end
+
 -- ── Perfis ───────────────────────────────────────────────────────────
 function M.load_profile(id)
     if not id or id == "" then return nil, "perfil vazio" end
