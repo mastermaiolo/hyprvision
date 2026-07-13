@@ -306,7 +306,7 @@ end
 -- ── Escrita no Hyprland ──────────────────────────────────────────────
 function M.notify(text)
     pcall(function()
-        M.hl.notification.create({ text = text, timeout = 3000, icon = "display" })
+        M.hl.notification.create({ text = text, timeout = 3000 })
     end)
 end
 
@@ -320,14 +320,16 @@ end
 local function set_icc(icc_path)
     for _, m in ipairs(M.hl.get_monitors() or {}) do
         if m.name then
-            M.hl.monitor({
+            local spec = {
                 output   = m.name,
                 mode     = string.format("%dx%d@%.3f", m.width or 1920,
                                          m.height or 1080, m.refreshRate or 60),
                 position = (m.x or 0) .. "x" .. (m.y or 0),
                 scale    = m.scale or 1.0,
-                icc      = icc_path or "",
-            })
+            }
+            -- hl.monitor rejeita icc="" — omitir o campo limpa o perfil
+            if icc_path and icc_path ~= "" then spec.icc = icc_path end
+            M.hl.monitor(spec)
         end
     end
 end
