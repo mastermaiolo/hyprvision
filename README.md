@@ -1,20 +1,21 @@
-# HyprVision v4
+# HyprVision 5
 
-**Gestor modular de ergonomia visual para o Hyprland** — perfis de cor com shaders GLSL, gamma/temperatura/brightness, perfis ICC e overlays compostáveis, tudo num menu Rofi.
+**Gestor de ergonomia visual nativo do Hyprland** — perfis de cor com shaders GLSL, gamma/temperatura/brightness, perfis ICC e overlays compostáveis, tudo num menu Rofi. Corre inteiro dentro do runtime Lua do compositor: sem daemon, sem Python.
 
-> Visual profile manager for Hyprland: GLSL screen shaders, gamma control, ICC profiles and composable overlays behind a Rofi menu. Docs in Portuguese.
+> Lua-native visual profile manager for Hyprland ≥ 0.55: GLSL screen shaders, gamma control, ICC profiles and composable overlays behind a Rofi menu. Docs in Portuguese.
 
 ## Funcionalidades
 
-- **Perfis visuais** definidos em TOML simples: shader + temperatura + brightness + gamma + ICC opcional
+- **Perfis visuais** definidos em Lua declarativo: shader + temperatura + brightness + gamma + ICC opcional
 - **Overlays compostáveis** por cima de qualquer perfil:
   - *Paper Texture* (light/medium/heavy) — textura de papel estilo e-ink: grão em duas oitavas, mottling de polpa, fibras anisotrópicas e lift quente das sombras
   - *Extra Dim* (10–50%) — escurecimento por shader, abaixo do mínimo do backlight
-- **Daemon adaptativo**: muda de perfil por horário e por estado da bateria (com recuperação automática do perfil anterior), hot-reload da config via SIGHUP
-- **Persistência real**: os perfis sobrevivem a `hyprctl reload` (o daemon escuta `configreloaded` no socket2 e reaplica shader/ICC, que o Hyprland limpa em cada reload)
-- **Shaders extra da comunidade**: pasta `shaders/extras/` integrada no menu, com estado e restore
-- **Reset de emergência** num atalho (`Super+Shift+H`) — se um perfil correr mal, um toque repõe o ecrã neutro
-- **Transições suaves** de temperatura/brightness/gamma via wl-gammarelay-rs
+- **Anti-banding para painéis 8-bit**: dither ~1 LSB sempre activo no shader composto + `render:use_fp16` (curvas em FP16 interno) + `render:icc_vcgt_enabled` (rampas VCGT por KMS)
+- **Adaptativo sem daemon**: perfil por horário e por estado da bateria (com recuperação automática do perfil anterior) via `hl.timer` nativo
+- **Persistência real**: os perfis sobrevivem a `hyprctl reload` — o runtime Lua é recriado e o `init.lua` restaura o estado ao carregar
+- **Shaders extra da comunidade**: pasta `shaders/extras/` integrada no menu
+- **Reset de emergência recuperável** (`Super+Shift+H`): repõe o ecrã neutro e arquiva o estado em `state.bak` — o menu ganha "Recuperar último estado"
+- **Transições suaves** de temperatura/brightness/gamma via wl-gammarelay-rs (arranque on-demand)
 
 ## Perfis incluídos
 
@@ -32,11 +33,10 @@
 
 ## Requisitos
 
-- Hyprland ≥ 0.55
-- Python ≥ 3.11 (usa `tomllib`, sem dependências pip)
+- Hyprland ≥ 0.55 **com config Lua** (`~/.config/hypr/hyprland.lua`) — para `hyprland.conf` clássico usa a v4 (branch `main`)
 - rofi
-- **Recomendado:** [wl-gammarelay-rs](https://github.com/MaxVerevkin/wl-gammarelay-rs) — temperatura, brightness e gamma com transições suaves (fallback: hyprsunset/wlsunset, só temperatura)
-- Opcional: libnotify (notificações), zenity (wizard de atalhos)
+- **Recomendado:** [wl-gammarelay-rs](https://github.com/MaxVerevkin/wl-gammarelay-rs) — temperatura, brightness e gamma com transições suaves
+- Opcional: libnotify (notificações); lua5.4 e glslangValidator só para correr os testes
 
 ## Instalação
 
@@ -45,32 +45,30 @@ git clone <este-repo> && cd hyprvision
 ./install.sh
 ```
 
-O instalador copia para `~/.config/hypr/hyprvision`, adiciona o `source` ao `hyprland.conf`, cria a config do daemon e activa os atalhos na sessão actual. Para escolher outro atalho que não `Super+H`: `bin/hyprvision-setup --force`.
+O instalador copia para `~/.config/hypr/hyprvision`, acrescenta o `require("init")` ao `hyprland.lua` e recarrega o Hyprland — fica logo activo. Correr de novo actualiza sem perder `config.lua` nem estado.
 
-Para desinstalar (pára o daemon, repõe o ecrã e remove tudo): `./uninstall.sh`.
+Para desinstalar (repõe o ecrã e remove tudo): `./uninstall.sh`.
 
-Self-check do projeto (compositor, horários, state, GLSL de todos os shaders): `python3 test_hyprvision.py`.
+Self-check do projeto (estado, perfis, compositor, horários, bateria, GLSL de todos os shaders, smoke test do menu): `lua5.4 test_hyprvision.lua`.
 
 ## Uso
 
-`Super+H` abre o menu. Tudo o que o menu faz também existe no CLI:
+`Super+H` abre o menu; `Super+Shift+H` é o reset de emergência. Para scripts, a mesma superfície que o menu usa:
 
 ```
-hyprvision --apply <id>            aplica um perfil
-hyprvision --apply-extra <file>    aplica um shader extra
-hyprvision --paper-texture <lvl>   off | light | medium | heavy
-hyprvision --dim <n>               0 | 10 | 20 | 30 | 40 | 50
-hyprvision --status                estado actual
-hyprvision --safe-reset            reset de emergência
-hyprvision --restore               restaura o último estado
-hyprvision --daemon-start/stop     controla o daemon
-hyprvision --reload-daemon         relê o daemon_config.toml (SIGHUP)
-hyprvision --init-config           cria/completa o daemon_config.toml
+hyprctl eval "hv.apply('night')"           aplica um perfil
+hyprctl eval "hv.overlay('paper','medium')"  off | light | medium | heavy
+hyprctl eval "hv.overlay('dim', 30)"       0 | 10 | 20 | 30 | 40 | 50
+hyprctl eval "hv.apply_extra('x.glsl')"    shader extra (em shaders/extras/)
+hyprctl eval "hv.safe_reset()"             reset de emergência
+hyprctl eval "hv.restore_backup()"         recupera o estado arquivado
 ```
 
-## Configuração do daemon
+O estado actual está sempre legível em `~/.config/hypr/hyprvision/state/state` (key=value).
 
-`~/.config/hypr/hyprvision/daemon_config.toml` (ver [daemon_config.example.toml](daemon_config.example.toml)) — tudo explícito, sem defaults invisíveis. Em qualquer evento, `profile = "none"` significa "não fazer nada". Destaques:
+## Configuração
+
+`~/.config/hypr/hyprvision/config.lua` — keybinds, horários e bateria. Depois de editar: `hyprctl reload`. Em qualquer evento, `profile = "none"` significa "não fazer nada". Destaques:
 
 - `battery.restore_after_low` — ao recuperar de bateria fraca, volta sozinho ao perfil que estava activo
 - `schedule.apply_on_start` — por omissão `false`: o arranque respeita o teu último perfil; os horários só disparam quando a hora cruza um slot
@@ -78,49 +76,40 @@ hyprvision --init-config           cria/completa o daemon_config.toml
 
 ## Criar um perfil
 
-`profiles/<categoria>/meu_perfil.toml`:
+`profiles/meu_perfil.lua`:
 
-```toml
-name        = "Meu Perfil"
-icon        = "🔥"
-description = "..."
-category    = "experience"
-
-[gamma]
-temperature = 5800      # 2500–9000 K
-brightness  = 0.95      # 0.05–1.5
-gamma       = 1.0       # 0.5–2.0
-
-[shader]
-file = "meu_perfil.glsl"   # em shaders/<categoria>/
-
-# [icc]
-# file = "meu_monitor.icc"
+```lua
+-- Uma linha sobre o perfil.
+return {
+    name = "Meu Perfil", icon = "🔥", category = "experience",
+    temperature = 5800,   -- 2500–9000 K
+    brightness  = 0.95,   -- 0.05–1.5
+    gamma       = 1.0,    -- 0.5–2.0
+    shader = "experience/meu_perfil.glsl",   -- em shaders/; nil = sem shader
+    -- icc = "meu_monitor.icc",              -- opcional, em icc/
+}
 ```
 
 **Importante nos shaders:** usa sempre `precision highp float;`. Com `mediump`, o ruído clássico `fract(sin(x) * 43758.5)` excede o alcance de fp16 em GPUs AMD/Mesa e produz NaN → **ecrã preto total**. (Todos os shaders incluídos já estão corrigidos.)
 
 ## Resolução de problemas
 
-- **Ecrã ficou preto/ilegível** → `Super+Shift+H` (safe reset). Causa habitual: shader com `mediump` (ver acima).
-- **Perfil "desapareceu" depois de mexer no tema/config** → não devia acontecer (o daemon reaplica após `configreloaded`); verifica se o daemon corre: `hyprvision --status`.
+- **Ecrã ficou preto/ilegível** → `Super+Shift+H` (safe reset); depois "Recuperar último estado" no menu se foi engano.
+- **Perfil "desapareceu" depois de mexer no tema/config** → não devia acontecer (o init restaura no reload); vê `state/hyprvision.log`.
 - **Aviso "uniform 'time'"** do Hyprland → shaders animados exigem `debug:damage_tracking 0` (mais GPU); o HyprVision gere isto automaticamente e na ordem certa.
-- Log do daemon: `~/.config/hypr/hyprvision/state/daemon.log`.
+- Log: `~/.config/hypr/hyprvision/state/hyprvision.log`.
 
 ## Arquitectura
 
 ```
-bin/hyprvision          CLI
-bin/hyprvision-daemon   daemon adaptativo (bateria, horário, configreloaded)
-bin/hyprvision-setup    wizard de atalhos
-core/apply.py           pipeline: perfil → validação → shader composto → gamma → ICC → estado
-core/shader.py          compositor GLSL de 3 camadas (perfil + paper texture + dim)
-core/gamma.py           backends wl-gammarelay-rs / hyprsunset
-core/daemonctl.py       PID, liveness, start/stop/reload
-ui/launcher.sh          menu Rofi
+init.lua        wiring no compositor: binds, timers, restore no load
+core.lua        motor: estado, perfis, compose GLSL, apply, gamma, ticks
+config.lua      configuração do utilizador (keybinds, horário, bateria)
+profiles/*.lua  perfis declarativos
+ui/launcher.sh  menu Rofi (lê state/, envia hyprctl eval "hv.*")
 ```
 
-Os shaders compostos são gerados em `$XDG_RUNTIME_DIR/hyprvision/`. O estado persiste em `state/current_state.json` (escrita atómica).
+O `hyprctl eval` não devolve output, por isso o Lua mantém `state/state` e `state/profiles.menu` como interface de leitura para o launcher. Os shaders compostos são gerados em `$XDG_RUNTIME_DIR/hyprvision/`. Tudo o que corre no compositor está embrulhado em `pcall` — um perfil roto regista no log e nunca derruba um handler.
 
 ## Créditos
 

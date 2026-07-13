@@ -1,5 +1,29 @@
 # Changelog
 
+## v5.0.0 — 2026-07-13
+
+Reescrita Lua-nativa. O HyprVision passa a viver dentro do Hyprland.
+
+### Alterado
+- **Zero Python, zero daemon próprio**: `init.lua` + `core.lua` correm no runtime
+  Lua do compositor; horário e bateria via `hl.timer`, reaplicação pós-reload
+  via re-execução do init (o runtime é recriado em cada reload — verificado).
+- Perfis passam de TOML para `profiles/*.lua`; config do daemon → `config.lua`.
+- O launcher lê `state/state` (key=value) e envia acções via `hyprctl eval "hv.*"`.
+- Gamma continua no wl-gammarelay-rs (rampas de hardware), com rampa suave
+  de 10 passos e arranque on-demand.
+
+### Adicionado
+- **Dither ~1 LSB** sempre activo no shader composto + `render:use_fp16` +
+  `render:icc_vcgt_enabled` — menos banding no painel 8-bit.
+- **Safe-reset recuperável**: arquiva o estado em `state.bak` em vez de o
+  apagar; entrada "Recuperar último estado" no menu.
+- `test_hyprvision.lua` (lua5.4 standalone, `hl` mock) com smoke test do launcher.
+
+### Removido
+- CLI `hyprvision`, `hyprvision-daemon`, `core/*.py`, listener socket2,
+  PID files, parser TOML, submenu do daemon no Rofi.
+
 ## v4.1.0 — 2026-07-13
 
 ### Corrigido
