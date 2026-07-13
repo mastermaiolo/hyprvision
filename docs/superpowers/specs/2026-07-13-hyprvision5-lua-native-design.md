@@ -1,7 +1,19 @@
 # HyprVision 5.0 — Design Lua-nativo
 
-**Data:** 2026-07-13 · **Estado:** aprovado em conversa, aguarda revisão do spec
+**Data:** 2026-07-13 · **Estado:** implementado e verificado ao vivo (branch `v5`)
 **Base:** v4.1.0 (`85bea4b`) · **Alvo:** Hyprland ≥ 0.55 com config `hyprland.lua`
+
+> **Adenda pós-implementação (verificado ao vivo):**
+> - Estado em **key=value** (`state/state`), não JSON — o bash lê sem dependências.
+> - Incógnita do reload resolvida: **o runtime Lua é recriado em cada reload**
+>   (globals e timers antigos morrem). O restore-no-load do init é o único
+>   mecanismo necessário; `hl.on('config.reloaded')` nem é usado.
+> - Neste sistema (caelestia com theming dinâmico) um reload dispara uma
+>   **rajada de ~10-20 reavaliações** da config. Inócuo: só o último runtime
+>   sobrevive com binds/timers, e o delay de 800 ms do restore debounça a rajada.
+> - API real: `hl.timer(fn, {timeout=ms, type="repeat"|"oneshot"})`; `hl.bind`
+>   aceita função Lua; `hl.monitor` **rejeita** `icc=""` (omitir o campo limpa);
+>   `hl.notification.create` sem campo `icon` (o valor "display" da v4 é inválido).
 
 ## Objectivo
 
