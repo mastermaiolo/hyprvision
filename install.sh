@@ -9,7 +9,7 @@ HYPRLUA="$HOME/.config/hypr/hyprland.lua"
 echo "── HyprVision 5 · instalação ──"
 [[ -f "$HYPRLUA" ]] || {
     echo "✗ $HYPRLUA não existe. O v5 requer config Lua (parser non-legacy)."
-    echo "  Para hyprland.conf clássico usa a v4 (branch main)."
+    echo "  Para hyprland.conf clássico usa a v4 (tag v4.1.0)."
     exit 1
 }
 command -v rofi &>/dev/null || echo "⚠  rofi em falta (menu não funcionará)"

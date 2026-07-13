@@ -33,7 +33,7 @@
 
 ## Requisitos
 
-- Hyprland ≥ 0.55 **com config Lua** (`~/.config/hypr/hyprland.lua`) — para `hyprland.conf` clássico usa a v4 (branch `main`)
+- Hyprland ≥ 0.55 **com config Lua** (`~/.config/hypr/hyprland.lua`) — para `hyprland.conf` clássico usa a v4 (tag `v4.1.0`)
 - rofi
 - **Recomendado:** [wl-gammarelay-rs](https://github.com/MaxVerevkin/wl-gammarelay-rs) — temperatura, brightness e gamma com transições suaves
 - Opcional: libnotify (notificações); lua5.4 e glslangValidator só para correr os testes
