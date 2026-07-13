@@ -47,6 +47,10 @@ git clone <este-repo> && cd hyprvision
 
 O instalador copia para `~/.config/hypr/hyprvision`, adiciona o `source` ao `hyprland.conf`, cria a config do daemon e activa os atalhos na sessão actual. Para escolher outro atalho que não `Super+H`: `bin/hyprvision-setup --force`.
 
+Para desinstalar (pára o daemon, repõe o ecrã e remove tudo): `./uninstall.sh`.
+
+Self-check do projeto (compositor, horários, state, GLSL de todos os shaders): `python3 test_hyprvision.py`.
+
 ## Uso
 
 `Super+H` abre o menu. Tudo o que o menu faz também existe no CLI:

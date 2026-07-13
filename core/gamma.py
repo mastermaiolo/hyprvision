@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import time
 import threading
@@ -31,7 +32,7 @@ class WlGammaRelayBackend(GammaBackend):
     def __init__(self):
         self._threads: list[threading.Thread] = []
 
-    def validate_available(self) -> bool:
+    def _ping(self) -> bool:
         try:
             r = subprocess.run(
                 ["busctl", "--user", "get-property",
@@ -41,6 +42,26 @@ class WlGammaRelayBackend(GammaBackend):
             return r.returncode == 0
         except FileNotFoundError:
             return False
+
+    def validate_available(self) -> bool:
+        if self._ping():
+            return True
+        # O pacote não traz D-Bus activation nem unit systemd — se o binário
+        # existe mas não está a correr, arranca-o aqui (on-demand, para todos
+        # os chamadores: CLI, daemon, restore). Instâncias concorrentes são
+        # inofensivas: só uma ganha o nome no bus, a outra sai sozinha.
+        if not shutil.which("wl-gammarelay-rs"):
+            return False
+        subprocess.Popen(
+            ["wl-gammarelay-rs"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        for _ in range(20):
+            time.sleep(0.1)
+            if self._ping():
+                return True
+        return False
 
     def _get(self, prop: str) -> float:
         r = subprocess.run(

@@ -9,6 +9,8 @@ Uso:
 import subprocess
 import os
 
+from .hyprctl import set_monitor_icc
+
 
 def _get_monitors() -> list[dict]:
     """Devolve dados dos monitores activos via hyprctl monitors -j."""
@@ -47,22 +49,10 @@ def apply_icc(icc_path: str) -> bool:
 
     ok = False
     for m in monitors:
-        name = m.get("name")
-        if not name:
+        if not m.get("name"):
             continue
-        width = m.get("width", 1920)
-        height = m.get("height", 1080)
-        refresh = m.get("refreshRate", 60.0)
-        x = m.get("x", 0)
-        y = m.get("y", 0)
-        scale = m.get("scale", 1.0)
         try:
-            r = subprocess.run(
-                ["hyprctl", "keyword", "monitor",
-                 f"{name},{width}x{height}@{refresh},{x}x{y},{scale},icc,{icc_path}"],
-                capture_output=True, text=True
-            )
-            if r.returncode == 0:
+            if set_monitor_icc(m, icc_path):
                 ok = True
         except Exception:
             pass
@@ -83,21 +73,10 @@ def reset_icc() -> None:
         return
 
     for m in monitors:
-        name = m.get("name")
-        if not name:
+        if not m.get("name"):
             continue
-        width = m.get("width", 1920)
-        height = m.get("height", 1080)
-        refresh = m.get("refreshRate", 60.0)
-        x = m.get("x", 0)
-        y = m.get("y", 0)
-        scale = m.get("scale", 1.0)
         try:
-            subprocess.run(
-                ["hyprctl", "keyword", "monitor",
-                 f"{name},{width}x{height}@{refresh},{x}x{y},{scale},icc,"],
-                capture_output=True, text=True
-            )
+            set_monitor_icc(m, "")
         except Exception:
             pass
 

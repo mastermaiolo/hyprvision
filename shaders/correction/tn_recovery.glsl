@@ -1,7 +1,7 @@
+#version 300 es
 // HyprVision · TN Recovery
 // Levanta sombras sem explodir o brilho + vibração selectiva de matiz
 // Ideal para painéis TN antigos e ecrãs de notebook "lavados"
-#version 300 es
 precision highp float;
 in vec2 v_texcoord;
 layout(location = 0) out vec4 fragColor;

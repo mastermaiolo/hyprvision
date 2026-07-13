@@ -27,7 +27,8 @@ command -v busctl &>/dev/null && busctl --user introspect rs.wl-gammarelay / &>/
 mkdir -p "$DEST"
 rsync -a \
     --exclude 'state/' --exclude '.git/' --exclude '__pycache__/' \
-    --exclude 'install.sh' --exclude 'README.md' --exclude 'CHANGELOG.md' \
+    --exclude 'install.sh' --exclude 'uninstall.sh' --exclude 'test_hyprvision.py' \
+    --exclude 'README.md' --exclude 'CHANGELOG.md' \
     --exclude 'daemon_config.example.toml' --exclude 'hyprvision.conf.example' \
     "$SRC"/ "$DEST"/
 chmod +x "$DEST"/bin/* "$DEST"/ui/launcher.sh
@@ -45,18 +46,38 @@ else
     echo "• $CONF já existe — mantido"
 fi
 
-# source no hyprland.conf
-if [[ -f "$HYPR" ]] && ! grep -q "hyprvision.conf" "$HYPR"; then
-    printf '\nsource = %s\n' "$CONF" >> "$HYPR"
-    echo "✓ source adicionado ao hyprland.conf"
+# source no hyprland.conf — ou require no hyprland.lua (config Lua)
+HYPRLUA="$HOME/.config/hypr/hyprland.lua"
+if [[ -f "$HYPR" ]]; then
+    if ! grep -q "hyprvision.conf" "$HYPR"; then
+        printf '\nsource = %s\n' "$CONF" >> "$HYPR"
+        echo "✓ source adicionado ao hyprland.conf"
+    fi
+elif [[ -f "$HYPRLUA" ]]; then
+    if ! grep -q "hyprvision_lua" "$HYPRLUA"; then
+        cat >> "$HYPRLUA" <<'LUA'
+
+-- HyprVision
+package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/hypr/hyprvision/?.lua"
+require("hyprvision_lua")
+LUA
+        echo "✓ require adicionado ao hyprland.lua"
+    fi
+else
+    echo "⚠  Nem hyprland.conf nem hyprland.lua encontrados — liga manualmente (ver README)."
 fi
 
 # Arranque imediato se estamos dentro do Hyprland
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
     "$DEST/bin/hyprvision" --daemon-stop  >/dev/null 2>&1 || true
     "$DEST/bin/hyprvision" --daemon-start >/dev/null
-    hyprctl keyword bind "SUPER, H, exec, $DEST/ui/launcher.sh" >/dev/null
-    hyprctl keyword bind "SUPER SHIFT, H, exec, $DEST/bin/hyprvision --safe-reset" >/dev/null
+    # Parser clássico usa `keyword bind`; parser Lua (hyprland.lua) exige eval
+    if hyprctl keyword bind "SUPER, H, exec, $DEST/ui/launcher.sh" 2>&1 | grep -q non-legacy; then
+        hyprctl eval "hl.bind('SUPER + H', hl.dsp.exec_cmd('$DEST/ui/launcher.sh'))" >/dev/null
+        hyprctl eval "hl.bind('SUPER + SHIFT + H', hl.dsp.exec_cmd('$DEST/bin/hyprvision --safe-reset'))" >/dev/null
+    else
+        hyprctl keyword bind "SUPER SHIFT, H, exec, $DEST/bin/hyprvision --safe-reset" >/dev/null
+    fi
     echo "✓ Daemon a correr e atalhos activos nesta sessão"
 fi
 

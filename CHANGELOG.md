@@ -1,5 +1,16 @@
 # Changelog
 
+## v4.1.0 — 2026-07-13
+
+### Corrigido
+- **Menu Rofi não aplicava nada**: o refactor para `main_menu()` deixou `[[ -z "$ID" ]] && exec "$0"` como última linha da função — com ID válido o `[[ ]]` devolve 1, o `set -e` mata o script na chamada e o `case` das acções nunca corria. Toda a selecção (perfis, reset, submenus) falhava em silêncio. Coberto por smoke test do launcher (rofi e CLI falsos) no self-check.
+- **`#version` fora da primeira linha** nos 9 shaders de perfil (comentários antes da directiva) — viola a spec GLSL ES 3.00; a Mesa tolera, outros drivers não. Detectado pelo novo self-check.
+- **wl-gammarelay-rs nunca arrancava sozinho**: o pacote não traz D-Bus activation nem unit systemd, e nada o lançava — o backend caía silenciosamente para hyprsunset (só temperatura). O `WlGammaRelayBackend` agora arranca-o on-demand quando o binário existe mas o serviço não responde.
+
+### Adicionado
+- **`test_hyprvision.py`** — self-check sem frameworks (`python3 test_hyprvision.py`): compositor de shaders, wrap de horários, round-trip do state, validador e sintaxe GLSL de todos os shaders (incluindo os compostos gerados) via glslangValidator.
+- **`uninstall.sh`** — reverte tudo: pára o daemon, repõe o ecrã neutro, remove ficheiros e o `source` do hyprland.conf.
+
 ## v4.0.0 — 2026-06-12
 
 Reescrita de robustez sobre a v3, mantendo a arquitectura.

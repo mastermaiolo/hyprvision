@@ -1,6 +1,6 @@
+#version 300 es
 // HyprVision · Focus
 // Saturação −75% + micro warmth — remove distracção de cor
-#version 300 es
 precision highp float;
 in vec2 v_texcoord;
 layout(location = 0) out vec4 fragColor;

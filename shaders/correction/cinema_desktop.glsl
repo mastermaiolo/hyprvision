@@ -1,6 +1,6 @@
+#version 300 es
 // HyprVision · Cinema Desktop
 // Microcontraste suave + profundidade tonal + mínimo warm tint
-#version 300 es
 precision highp float;
 in vec2 v_texcoord;
 layout(location = 0) out vec4 fragColor;

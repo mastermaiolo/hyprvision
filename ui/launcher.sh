@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# HyprVision v4 · Launcher Rofi
+# HyprVision · Launcher Rofi
+# Menu principal (perfis) + submenus: Paper Texture, Extra Dim, Extras, Daemon.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,8 +11,10 @@ ROFI_THEME="$BASE_DIR/rofi/hyprvision.rasi"
 [[ -f "$CLI" ]] || { notify-send -u critical "HyprVision" "CLI não encontrado: $CLI"; exit 1; }
 [[ -x "$CLI" ]] || chmod +x "$CLI"
 
+STATUS_RAW=$("$CLI" --status 2>/dev/null)
+
 # Prompt de estado
-STATUS=$("$CLI" --status 2>/dev/null | awk -F': ' '
+STATUS=$(echo "$STATUS_RAW" | awk -F': ' '
     /^Perfil/    { p=$2 }
     /^Extra /    { ex=$2 }
     /^Paper Tex/ { pt=$2 }
@@ -25,106 +28,124 @@ STATUS=$("$CLI" --status 2>/dev/null | awk -F': ' '
     }
 ')
 
-PROFILES=$("$CLI" --list-rofi)
+rofi_menu() {   # $1 prompt · stdin linhas → escolha (raw)
+    rofi -dmenu -p "$1" -theme "$ROFI_THEME" -no-custom -markup-rows -format s
+}
 
-# Rofi
-choice=$(echo -e "$PROFILES" | rofi \
-    -dmenu \
-    -p "$STATUS" \
-    -theme "$ROFI_THEME" \
-    -no-custom \
-    -format s) || exit 0
+pick_id() {   # extrai o [id] da linha escolhida
+    grep -o '\[[^]]*\]' | tail -1 | tr -d '[]'
+}
 
-[[ -z "$choice" ]] && exit 0
+# Submenu genérico: linhas "icone texto [id]"; devolve id (vazio = cancelado)
+submenu() {   # $1 prompt
+    rofi_menu "$1" | pick_id || true
+}
 
-# Separadores de categoria não têm [id] — reabre o menu
-[[ "$choice" == ──* ]] && exec "$0"
+main_menu() {
+    local choice
+    choice=$("$CLI" --list-rofi | rofi_menu "$STATUS") || exit 0
+    [[ -z "$choice" ]] && exit 0
+    # Separadores de categoria não têm [id] — reabre o menu
+    [[ "$choice" == *"──"* ]] && exec "$0"
+    ID=$(echo "$choice" | pick_id)
+    # `if` e não `[[ ]] &&`: como última linha da função, o status 1 do
+    # teste falhado matava o script inteiro via set -e (menu "não fazia nada")
+    if [[ -z "$ID" ]]; then exec "$0"; fi
+}
 
-# Extrai ID entre [ ]
-ID=$(echo "$choice" | grep -o '\[[^]]*\]' | tail -1 | tr -d '[]')
-[[ -z "$ID" ]] && exec "$0"
+back_row() { printf '↩ Voltar   <span alpha="30%%" size="small">[__back__]</span>\n'; }
+
+main_menu
 
 case "$ID" in
-    paper_tex_*)
-        "$CLI" --paper-texture "${ID#paper_tex_}"
+    __paper__)
+        CUR=$(echo "$STATUS_RAW" | awk -F': ' '/^Paper Tex/ {print $2}')
+        SEL=$({ back_row
+                for lvl in off light medium heavy; do
+                    mark=""; [[ "$lvl" == "$CUR" ]] && mark="  ✓"
+                    printf '📄 %s%s   <span alpha="30%%" size="small">[%s]</span>\n' "$lvl" "$mark" "$lvl"
+                done; } | submenu "📄 Paper Texture")
+        [[ -z "$SEL" ]] && exit 0
+        [[ "$SEL" == "__back__" ]] && exec "$0"
+        "$CLI" --paper-texture "$SEL"
         ;;
-    dim_*)
-        "$CLI" --dim "${ID#dim_}"
+    __dim__)
+        CUR=$(echo "$STATUS_RAW" | awk -F': ' '/^Dim/ {print $2}')
+        SEL=$({ back_row
+                for lvl in 0 10 20 30 40 50; do
+                    mark=""; [[ "${lvl}%" == "$CUR" ]] && mark="  ✓"
+                    printf '🔅 %s%%%s   <span alpha="30%%" size="small">[%s]</span>\n' "$lvl" "$mark" "$lvl"
+                done; } | submenu "🔅 Extra Dim")
+        [[ -z "$SEL" ]] && exit 0
+        [[ "$SEL" == "__back__" ]] && exec "$0"
+        "$CLI" --dim "$SEL"
         ;;
     __extras__)
         EXTRAS_DIR="$BASE_DIR/shaders/extras"
-        count=$(find "$EXTRAS_DIR" \( -name "*.glsl" -o -name "*.frag" \) 2>/dev/null | wc -l)
-        if [[ "$count" -eq 0 ]]; then
+        mapfile -t EXTRAS < <(find "$EXTRAS_DIR" \( -name "*.glsl" -o -name "*.frag" \) \
+            -printf "%f\n" 2>/dev/null | sort)
+        if ((${#EXTRAS[@]} == 0)); then
             rofi -e "Pasta extras vazia.\n\nColoca .glsl em:\n$EXTRAS_DIR" \
                 -theme "$ROFI_THEME" || true
             exit 0
         fi
-        extra_choice=$(find "$EXTRAS_DIR" \( -name "*.glsl" -o -name "*.frag" \) \
-            -printf "%f\n" | sort | \
-            rofi -dmenu -p "🌐 Extras" -theme "$ROFI_THEME") || exit 0
-        [[ -z "$extra_choice" ]] && exit 0
+        CUR=$(echo "$STATUS_RAW" | awk -F': ' '/^Extra / {print $2}')
+        SEL=$({ back_row
+                for f in "${EXTRAS[@]}"; do
+                    mark=""; [[ "$f" == "$CUR" ]] && mark="  ✓"
+                    printf '🌐 %s%s   <span alpha="30%%" size="small">[%s]</span>\n' "${f%.*}" "$mark" "$f"
+                done; } | submenu "🌐 Shaders extra")
+        [[ -z "$SEL" ]] && exit 0
+        [[ "$SEL" == "__back__" ]] && exec "$0"
         # Passa pelo pipeline: composto com overlays e registado no estado
-        "$CLI" --apply-extra "$extra_choice"
+        "$CLI" --apply-extra "$SEL"
         ;;
-    __daemon_status__)
-        # Só mostra info — reabre o menu
-        exec "$0"
-        ;;
-    __daemon_config__)
-        CONFIG="$HOME/.config/hypr/hyprvision/daemon_config.toml"
-        # Garante que o ficheiro existe e tem TODAS as secções visíveis
-        "$CLI" --init-config >/dev/null
-
-        # Abre no editor preferido (XDG)
-        EDITOR_CMD=""
-        for ed in "${VISUAL:-}" "${EDITOR:-}" code gedit kate nano; do
-            if [[ -n "$ed" ]] && command -v "${ed%% *}" &>/dev/null; then
-                EDITOR_CMD="$ed"
-                break
-            fi
-        done
-
-        if [[ -z "$EDITOR_CMD" ]]; then
-            notify-send -a "HyprVision" "Config" "Edita manualmente: $CONFIG"
-            xdg-open "$CONFIG" 2>/dev/null || true
+    __daemon__)
+        if "$CLI" --status | grep -q "a correr"; then
+            ROWS=$'🔄 Recarregar config   <span alpha="30%" size="small">[reload]</span>\n🛑 Parar daemon   <span alpha="30%" size="small">[stop]</span>'
         else
-            # GUI editors são lançados em background; editors de terminal
-            # precisam de uma janela de terminal
-            case "${EDITOR_CMD%% *}" in
-                code|gedit|kate|nautilus|nemo|thunar)
-                    $EDITOR_CMD "$CONFIG" &
-                    disown
-                    ;;
-                *)
-                    TERM_CMD=""
-                    for t in foot kitty alacritty wezterm gnome-terminal konsole xterm; do
-                        if command -v "$t" &>/dev/null; then TERM_CMD="$t"; break; fi
-                    done
-                    if [[ -n "$TERM_CMD" ]]; then
-                        $TERM_CMD -e $EDITOR_CMD "$CONFIG" &
-                        disown
-                    else
-                        xdg-open "$CONFIG" 2>/dev/null || true
-                    fi
-                    ;;
-            esac
+            ROWS='▶️  Iniciar daemon   <span alpha="30%" size="small">[start]</span>'
         fi
-        notify-send -a "HyprVision" "Config" "Após guardar, corre: hyprvision --reload-daemon"
-        ;;
-    __daemon_reload__)
-        "$CLI" --reload-daemon && \
-            notify-send -a "HyprVision" "Daemon" "Configuração recarregada ✓" || \
-            notify-send -a "HyprVision" "Daemon" "Daemon não está a correr."
-        ;;
-    __daemon_stop__)
-        "$CLI" --daemon-stop && \
-            notify-send -a "HyprVision" "Daemon" "Daemon parado." || \
-            notify-send -u critical -a "HyprVision" "Daemon" "Falha ao parar o daemon."
-        ;;
-    __daemon_start__)
-        "$CLI" --daemon-start && \
-            notify-send -a "HyprVision" "Daemon" "Daemon iniciado ✓" || \
-            notify-send -u critical -a "HyprVision" "Daemon" "Falha ao iniciar o daemon."
+        SEL=$({ back_row; echo "$ROWS"
+                echo '📝 Editar configuração (TOML)   <span alpha="30%" size="small">[config]</span>'
+              } | submenu "⚙️ Daemon")
+        [[ -z "$SEL" ]] && exit 0
+        case "$SEL" in
+            __back__) exec "$0" ;;
+            start)  "$CLI" --daemon-start  && notify-send -a HyprVision "Daemon" "Iniciado ✓" ;;
+            stop)   "$CLI" --daemon-stop   && notify-send -a HyprVision "Daemon" "Parado." ;;
+            reload) "$CLI" --reload-daemon && notify-send -a HyprVision "Daemon" "Config recarregada ✓" ;;
+            config)
+                CONFIG="$HOME/.config/hypr/hyprvision/daemon_config.toml"
+                "$CLI" --init-config >/dev/null
+                EDITOR_CMD=""
+                for ed in "${VISUAL:-}" "${EDITOR:-}" code gedit kate nano; do
+                    if [[ -n "$ed" ]] && command -v "${ed%% *}" &>/dev/null; then
+                        EDITOR_CMD="$ed"; break
+                    fi
+                done
+                if [[ -z "$EDITOR_CMD" ]]; then
+                    xdg-open "$CONFIG" 2>/dev/null || \
+                        notify-send -a HyprVision "Config" "Edita manualmente: $CONFIG"
+                else
+                    case "${EDITOR_CMD%% *}" in
+                        code|gedit|kate)
+                            $EDITOR_CMD "$CONFIG" & disown ;;
+                        *)
+                            TERM_CMD=""
+                            for t in foot kitty alacritty wezterm ghostty gnome-terminal konsole xterm; do
+                                command -v "$t" &>/dev/null && { TERM_CMD="$t"; break; }
+                            done
+                            if [[ -n "$TERM_CMD" ]]; then
+                                $TERM_CMD -e $EDITOR_CMD "$CONFIG" & disown
+                            else
+                                xdg-open "$CONFIG" 2>/dev/null || true
+                            fi ;;
+                    esac
+                fi
+                notify-send -a HyprVision "Config" "Após guardar: hyprvision --reload-daemon"
+                ;;
+        esac
         ;;
     *)
         "$CLI" --apply "$ID"

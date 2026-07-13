@@ -20,9 +20,10 @@ partilhado — evita colisões com ficheiros de outras aplicações.
 """
 import os
 import re
-import subprocess
 import tempfile
 from abc import ABC, abstractmethod
+
+from .hyprctl import set_option
 
 
 # ── Backend abstracto ────────────────────────────────────────────────
@@ -54,19 +55,12 @@ class HyprctlBackend(ShaderBackend):
 
     @staticmethod
     def _set_tracking(value: str) -> None:
-        subprocess.run(
-            ["hyprctl", "keyword", "debug:damage_tracking", value],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
+        set_option("debug:damage_tracking", value)
 
     @staticmethod
     def _set_shader(path: str) -> None:
-        r = subprocess.run(
-            ["hyprctl", "keyword", "decoration:screen_shader", path],
-            capture_output=True, text=True
-        )
-        if r.returncode != 0:
-            raise RuntimeError(f"hyprctl falhou: {r.stderr.strip()}")
+        if not set_option("decoration:screen_shader", path):
+            raise RuntimeError("hyprctl não aceitou o screen_shader")
 
     def apply(self, path: str) -> None:
         if not os.path.isfile(path):
@@ -85,10 +79,7 @@ class HyprctlBackend(ShaderBackend):
             self._set_tracking("2")   # 2 = tracking completo (normal)
 
     def reset(self) -> None:
-        subprocess.run(
-            ["hyprctl", "keyword", "decoration:screen_shader", ""],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
+        set_option("decoration:screen_shader", "")
         self._set_tracking("2")
 
 
@@ -198,21 +189,29 @@ def compose_shader(
 // HyprVision · Shader Composto (gerado automaticamente)
 // perfil={os.path.basename(profile_glsl or 'none')}
 // paper_texture={paper_texture}  dim={dim_level}%
-// highp obrigatório: o ruído fract(sin(x*43758)) excede o alcance de
-// fp16 (mediump em Mesa/AMD) e produz NaN → ecrã preto.
+// highp obrigatório: shaders de perfil ainda usam fract(sin(x*43758)),
+// que excede o alcance de fp16 (mediump em Mesa/AMD) → NaN → ecrã preto.
 precision highp float;
 in vec2 v_texcoord;
 layout(location = 0) out vec4 fragColor;
 uniform sampler2D tex;
 
+// Hash sem seno (Dave Hoskins) — sem os artefactos diagonais do
+// sin-hash e sem risco de overflow em fp16.
+float _hash(vec2 p) {{
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}}
+
 float _paperNoise(vec2 p) {{
     vec2 ip = floor(p);
     vec2 fp = fract(p);
     fp = fp * fp * (3.0 - 2.0 * fp);
-    float a = fract(sin(dot(ip,                  vec2(127.1, 311.7))) * 43758.5);
-    float b = fract(sin(dot(ip + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5);
-    float c = fract(sin(dot(ip + vec2(0.0, 1.0), vec2(127.1, 311.7))) * 43758.5);
-    float d = fract(sin(dot(ip + vec2(1.0, 1.0), vec2(127.1, 311.7))) * 43758.5);
+    float a = _hash(ip);
+    float b = _hash(ip + vec2(1.0, 0.0));
+    float c = _hash(ip + vec2(0.0, 1.0));
+    float d = _hash(ip + vec2(1.0, 1.0));
     return mix(mix(a, b, fp.x), mix(c, d, fp.x), fp.y);
 }}
 
@@ -229,9 +228,10 @@ void main() {{
     // Camada 2: Paper Texture (superfície e-ink: fibras + grão + mottling)
     float _pi = {pi:.4f};
     if (_pi > 0.001) {{
-        // Grão fino em duas oitavas
+        // Grão fino em duas oitavas — a 2ª rodada ~37° para quebrar o
+        // alinhamento da grelha do value noise
         float _g1 = _paperNoise(v_texcoord * 700.0);
-        float _g2 = _paperNoise(v_texcoord * 1400.0 + vec2(0.37, 0.63));
+        float _g2 = _paperNoise(mat2(0.8, -0.6, 0.6, 0.8) * v_texcoord * 1400.0 + vec2(0.37, 0.63));
         // Mottling de baixa frequência — manchas da polpa do papel
         float _m  = _paperNoise(v_texcoord * 90.0 + vec2(7.13, 3.71));
         // Fibras horizontais subtis (anisotropia do papel)

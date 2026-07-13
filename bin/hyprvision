@@ -146,6 +146,16 @@ def main() -> None:
         sys.exit(0)
 
     if args.list_rofi:
+        # Menu principal: perfis por categoria + entradas de submenu.
+        # Saída com pango markup (launcher passa -markup-rows ao rofi);
+        # os separadores e os [ids] ficam esbatidos, o resto legível.
+        def sep(label):
+            print(f"<span alpha='55%' style='italic'>──  {label}  ──</span>")
+
+        def row(icon, text, rid, mark=False):
+            m = "  ✓" if mark else ""
+            print(f"{icon} {text}{m}   <span alpha='30%' size='small'>[{rid}]</span>")
+
         loader   = ProfileLoader(os.path.join(BASE_DIR, "profiles"))
         profiles = loader.load_all_profiles()
         order    = {"correction": 0, "experience": 1, "system": 2}
@@ -156,45 +166,23 @@ def main() -> None:
         last_cat = None
         for pr in profiles:
             if pr.category != last_cat:
-                cat_label = {
-                    "correction": "── 🔧 CORRECTION ──",
-                    "experience": "── 🎭 EXPERIENCE ──",
-                    "system":     "── ⚙️  SYSTEM ──",
-                }.get(pr.category, f"── {pr.category.upper()} ──")
-                print(cat_label)
+                sep({"correction": "🔧 CORRECTION",
+                     "experience": "🎭 EXPERIENCE",
+                     "system":     "⚙️  SYSTEM"}.get(pr.category, pr.category.upper()))
                 last_cat = pr.category
-            mark = "  ✓" if (state.active_profile == pr.id
-                             and not state.extra_shader) else ""
-            print(f"{pr.icon} {pr.name}{mark}   [{pr.id}]")
+            row(pr.icon, pr.name, pr.id,
+                mark=(state.active_profile == pr.id and not state.extra_shader))
 
-        print("── 📄 PAPER TEXTURE ──")
-        for lvl in ("light", "medium", "heavy", "off"):
-            mark = "  ✓" if state.overlay.paper_texture == lvl else ""
-            print(f"📄 Paper Texture: {lvl}{mark}   [paper_tex_{lvl}]")
-
-        print("── 💡 EXTRA DIM ──")
-        for lvl in (10, 20, 30, 40, 50):
-            mark = "  ✓" if state.overlay.dim_level == lvl else ""
-            print(f"🔅 Dim {lvl}%{mark}   [dim_{lvl}]")
-        doff = "  ✓" if state.overlay.dim_level == 0 else ""
-        print(f"🔅 Dim Off{doff}   [dim_0]")
-
-        print("── 🌐 EXTRAS ──")
-        extra_label = ""
-        if state.extra_shader:
-            extra_label = f"  ✓ {os.path.basename(state.extra_shader)}"
-        print(f"🌐 Extras (comunidade){extra_label}   [__extras__]")
-
-        print("── ⚙️  DAEMON ──")
+        sep("🧩 OVERLAYS · EXTRAS · DAEMON")
+        row("📄", f"Paper Texture: {state.overlay.paper_texture}  ▸", "__paper__",
+            mark=(state.overlay.paper_texture != "off"))
+        row("🔅", f"Extra Dim: {state.overlay.dim_level}%  ▸", "__dim__",
+            mark=(state.overlay.dim_level > 0))
+        extra = os.path.basename(state.extra_shader)
+        row("🌐", f"Shaders extra{': ' + extra if extra else ''}  ▸", "__extras__",
+            mark=bool(extra))
         pid = daemonctl.running_pid(BASE_DIR)
-        if pid:
-            print(f"⚙️  Daemon: a correr (PID {pid})   [__daemon_status__]")
-            print(f"🔄 Recarregar config daemon   [__daemon_reload__]")
-            print(f"🛑 Parar daemon   [__daemon_stop__]")
-        else:
-            print(f"⚙️  Daemon: parado   [__daemon_status__]")
-            print(f"▶️  Iniciar daemon   [__daemon_start__]")
-        print(f"📝 Editar configuração (TOML)   [__daemon_config__]")
+        row("⚙️", f"Daemon: {'a correr' if pid else 'parado'}  ▸", "__daemon__")
         sys.exit(0)
 
     if args.apply:
