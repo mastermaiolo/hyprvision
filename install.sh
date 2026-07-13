@@ -30,17 +30,15 @@ chmod +x "$DEST/ui/launcher.sh"
 [[ -f "$DEST/config.lua" ]] || cp "$SRC/config.lua" "$DEST/config.lua"
 echo "✓ Ficheiros em $DEST (config.lua e state/ preservados)"
 
-# remove o require v4 e garante o v5 (idempotente)
-sed -i '/hyprvision_lua/d' "$HYPRLUA"
-if ! grep -q 'hyprvision/?.lua' "$HYPRLUA"; then
-    cat >> "$HYPRLUA" <<'LUA'
-
+# remove qualquer bloco HyprVision anterior (v4 ou v5) e recria — idempotente;
+# apagar só o require v4 deixaria o package.path antigo a enganar checks de grep
+sed -i -e '/hyprvision/d' -e '/^-- HyprVision/d' -e '/require("init")/d' "$HYPRLUA"
+cat >> "$HYPRLUA" <<'LUA'
 -- HyprVision 5
 package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/hypr/hyprvision/?.lua"
 require("init")
 LUA
-    echo "✓ require adicionado ao hyprland.lua"
-fi
+echo "✓ require garantido no hyprland.lua"
 
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
     hyprctl reload >/dev/null && echo "✓ Hyprland recarregado — HyprVision activo"
