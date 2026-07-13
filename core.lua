@@ -65,4 +65,51 @@ function M.write_state(st)
     os.rename(tmp, M.state_file_path())   -- escrita atómica
 end
 
+-- ── Perfis ───────────────────────────────────────────────────────────
+function M.load_profile(id)
+    if not id or id == "" then return nil, "perfil vazio" end
+    local path = M.base .. "/profiles/" .. id .. ".lua"
+    local chunk = loadfile(path)
+    if not chunk then return nil, "perfil não encontrado: " .. id end
+    local ok, prof = pcall(chunk)
+    if not ok or type(prof) ~= "table" then
+        return nil, "perfil inválido: " .. id
+    end
+    prof.id = id
+    return prof
+end
+
+local CAT_ORDER = { correction = 1, experience = 2, system = 3 }
+
+function M.list_profiles()
+    local out = {}
+    local p = io.popen("ls '" .. M.base .. "/profiles' 2>/dev/null")
+    if p then
+        for f in p:lines() do
+            local id = f:match("^(.+)%.lua$")
+            if id then
+                local prof = M.load_profile(id)
+                if prof then out[#out + 1] = prof end
+            end
+        end
+        p:close()
+    end
+    table.sort(out, function(a, b)
+        local ca = CAT_ORDER[a.category] or 9
+        local cb = CAT_ORDER[b.category] or 9
+        if ca ~= cb then return ca < cb end
+        return (a.name or a.id) < (b.name or b.id)
+    end)
+    return out
+end
+
+function M.write_menu_index()
+    local f = assert(io.open(M.state_dir .. "/profiles.menu.tmp", "w"))
+    for _, p in ipairs(M.list_profiles()) do
+        f:write(table.concat({ p.id, p.icon, p.name, p.category }, "\t") .. "\n")
+    end
+    f:close()
+    os.rename(M.state_dir .. "/profiles.menu.tmp", M.state_dir .. "/profiles.menu")
+end
+
 return M

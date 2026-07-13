@@ -54,6 +54,48 @@ function T.test_state_ignora_lixo()
     assert(st.dim == 0, "número inválido devia cair no default")
 end
 
+function T.test_profiles_carregam_todos()
+    local all = core.list_profiles()
+    assert(#all == 10, "esperava 10 perfis, tenho " .. #all)
+    local ids = {}
+    for _, p in ipairs(all) do
+        ids[p.id] = true
+        assert(p.name and p.icon and p.category, p.id .. ": campos em falta")
+        assert(p.temperature and p.brightness and p.gamma,
+               p.id .. ": gamma em falta")
+        if p.shader then
+            local f = io.open(ROOT .. "/shaders/" .. p.shader)
+            assert(f, p.id .. ": shader não existe: " .. tostring(p.shader))
+            f:close()
+        end
+    end
+    for _, id in ipairs({ "night", "reset", "cinema_oled", "tn_recovery" }) do
+        assert(ids[id], "falta o perfil " .. id)
+    end
+    -- ordenação: correction primeiro, system no fim
+    assert(all[1].category == "correction", "correction devia vir primeiro")
+    assert(all[#all].category == "system", "system devia vir no fim")
+end
+
+function T.test_profile_invalido()
+    local p, err = core.load_profile("nao_existe")
+    assert(p == nil and err, "perfil inexistente devia dar nil, err")
+end
+
+function T.test_menu_index()
+    core.write_menu_index()
+    local f = assert(io.open(TMP .. "/profiles.menu"))
+    local n, night = 0, nil
+    for line in f:lines() do
+        n = n + 1
+        local id, icon, name, cat = line:match("^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$")
+        assert(id and icon and name and cat, "linha malformada: " .. line)
+        if id == "night" then night = { icon = icon, name = name } end
+    end
+    f:close()
+    assert(n == 10 and night and night.name == "Night", "índice do menu errado")
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end
