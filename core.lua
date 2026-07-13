@@ -303,4 +303,196 @@ function M.write_menu_index()
     os.rename(M.state_dir .. "/profiles.menu.tmp", M.state_dir .. "/profiles.menu")
 end
 
+-- ── Escrita no Hyprland ──────────────────────────────────────────────
+function M.notify(text)
+    pcall(function()
+        M.hl.notification.create({ text = text, timeout = 3000, icon = "display" })
+    end)
+end
+
+local function set_shader(path)
+    -- ordem importa (fix v4): shader novo primeiro, tracking depois —
+    -- senão o Hyprland revalida o shader antigo e verte avisos de uniform
+    M.hl.config({ decoration = { screen_shader = path or "" } })
+    M.hl.config({ debug = { damage_tracking = (path and M._animated) and 0 or 2 } })
+end
+
+local function set_icc(icc_path)
+    for _, m in ipairs(M.hl.get_monitors() or {}) do
+        if m.name then
+            M.hl.monitor({
+                output   = m.name,
+                mode     = string.format("%dx%d@%.3f", m.width or 1920,
+                                         m.height or 1080, m.refreshRate or 60),
+                position = (m.x or 0) .. "x" .. (m.y or 0),
+                scale    = m.scale or 1.0,
+                icc      = icc_path or "",
+            })
+        end
+    end
+end
+
+-- ── Gamma via wl-gammarelay-rs ───────────────────────────────────────
+local GAMMA_CMD = "busctl --user %s-property rs.wl-gammarelay / rs.wl.gammarelay %s"
+
+local function gamma_get(prop)
+    local p = io.popen((GAMMA_CMD):format("get", prop) .. " 2>/dev/null")
+    if not p then return nil end
+    local out = p:read("*a"); p:close()
+    return tonumber(out and out:match("([%d%.]+)%s*$"))
+end
+
+local function gamma_set(prop, sig, val)
+    local v = (sig == "q") and tostring(math.floor(val + 0.5))
+              or string.format("%.4f", val)
+    M.hl.exec_cmd((GAMMA_CMD):format("set", prop) .. " " .. sig .. " " .. v)
+end
+
+local function gamma_ramp(temp, bright, gam)
+    local cur = {
+        Temperature = gamma_get("Temperature") or 6500,
+        Brightness  = gamma_get("Brightness") or 1.0,
+        Gamma       = gamma_get("Gamma") or 1.0,
+    }
+    local tgt = { Temperature = temp, Brightness = bright, Gamma = gam }
+    local sig = { Temperature = "q", Brightness = "d", Gamma = "d" }
+    local STEPS = 10
+    local function step(i)
+        for prop, t in pairs(tgt) do
+            gamma_set(prop, sig[prop], cur[prop] + (t - cur[prop]) * i / STEPS)
+        end
+        if i < STEPS then
+            M.hl.timer(function() step(i + 1) end, { timeout = 35, type = "oneshot" })
+        end
+    end
+    step(1)
+end
+
+function M.set_gamma(temp, bright, gam)
+    if gamma_get("Temperature") == nil then
+        -- pacote sem D-Bus activation: arranca on-demand; instâncias
+        -- concorrentes são inofensivas (só uma ganha o nome no bus)
+        M.hl.exec_cmd("wl-gammarelay-rs")
+        M.hl.timer(function() gamma_ramp(temp, bright, gam) end,
+                   { timeout = 600, type = "oneshot" })
+    else
+        gamma_ramp(temp, bright, gam)
+    end
+end
+
+-- ── Pipeline ─────────────────────────────────────────────────────────
+local function apply_visuals(st)
+    local shader_abs = nil
+    if st.extra ~= "" then
+        shader_abs = M.base .. "/shaders/extras/" .. st.extra
+    elseif st.shader ~= "" then
+        shader_abs = M.base .. "/shaders/" .. st.shader
+    end
+    set_shader(M.compose(shader_abs, st.paper, st.dim))
+    set_icc(st.icc)
+    M.set_gamma(st.temperature, st.brightness, st.gamma)
+end
+
+function M.apply(id)
+    local prof, err = M.load_profile(id)
+    if not prof then M.log("apply: " .. tostring(err)); return false, err end
+    local st = M.read_state()
+    st.profile     = id
+    st.shader      = prof.shader or ""
+    st.extra       = ""
+    st.icc         = prof.icc or ""
+    st.temperature = prof.temperature or 6500
+    st.brightness  = prof.brightness or 1.0
+    st.gamma       = prof.gamma or 1.0
+    apply_visuals(st)
+    M.write_state(st)
+    M.notify(prof.icon .. " " .. prof.name)
+    return true
+end
+
+function M.overlay(kind, value)
+    local st = M.read_state()
+    if kind == "paper" then st.paper = value
+    elseif kind == "dim" then st.dim = tonumber(value) or 0
+    else return false, "overlay desconhecido: " .. tostring(kind) end
+    apply_visuals(st)
+    M.write_state(st)
+    M.notify(kind == "paper" and ("📄 Paper: " .. st.paper)
+             or ("🔅 Dim: " .. st.dim .. "%"))
+    return true
+end
+
+function M.apply_extra(fname)
+    local st = M.read_state()
+    st.extra, st.profile, st.shader = fname, "", ""
+    apply_visuals(st)
+    M.write_state(st)
+    M.notify("🌐 " .. fname)
+    return true
+end
+
+function M.safe_reset()
+    set_shader(nil)
+    set_icc("")
+    M.set_gamma(6500, 1.0, 1.0)
+    -- arquiva em vez de apagar: boot seguinte fica neutro (um perfil
+    -- roto não volta), mas o menu pode recuperar via restore_backup
+    os.rename(M.state_file_path(), M.state_file_path() .. ".bak")
+    M.notify("⚡ Reset — ecrã neutro (estado guardado)")
+    return true
+end
+
+function M.restore()
+    local st, existed = M.read_state()
+    if not existed then return false end
+    apply_visuals(st)
+    return true
+end
+
+function M.restore_backup()
+    if not os.rename(M.state_file_path() .. ".bak", M.state_file_path()) then
+        M.notify("Nada para recuperar."); return false
+    end
+    M.restore()
+    local st = M.read_state()
+    M.notify("↩ Recuperado: " .. (st.profile ~= "" and st.profile or st.extra))
+    return true
+end
+
+-- ── Ticks (chamados pelos timers do init; mem morre no reload) ──────
+function M.tick_schedule(cfg, mem)
+    local sc = cfg.schedule
+    if not (sc and sc.enabled) then return end
+    local now = tonumber(os.date("%H")) * 60 + tonumber(os.date("%M"))
+    local slot = M.current_slot(sc.slots, now)
+    if not slot then mem.prev_slot = nil; return end
+    if slot.name == mem.prev_slot then return end
+    local first = (mem.prev_slot == nil)
+    mem.prev_slot = slot.name
+    if first and not sc.apply_on_start then return end
+    M.notify("🕐 Horário (" .. slot.name .. ") → " .. slot.profile)
+    M.apply(slot.profile)
+end
+
+function M.tick_battery(cfg, mem)
+    local bc = cfg.battery
+    if not (bc and bc.enabled) then return end
+    local cap, status = M.read_battery()
+    if not cap then return end
+    local power, act = M.battery_transition(bc, mem.prev_power, cap, status)
+    mem.prev_power = power
+    if not act then return end
+    if act.restore_pre_low then
+        if mem.pre_low and mem.pre_low ~= "" then
+            M.notify("🔋 Bateria recuperada → " .. mem.pre_low)
+            M.apply(mem.pre_low)
+        end
+        mem.pre_low = nil
+    else
+        if act.remember then mem.pre_low = M.read_state().profile end
+        M.notify("⚠️ Bateria (" .. cap .. "%) → " .. act.apply)
+        M.apply(act.apply)
+    end
+end
+
 return M

@@ -182,6 +182,77 @@ function T.test_battery_transition()
     assert(act == nil, "sem transição não há acção")
 end
 
+local function exec_count(pat)
+    local n = 0
+    for _, c in ipairs(calls) do
+        if c[1] == "exec" and c[2]:match(pat) then n = n + 1 end
+    end
+    return n
+end
+local function last_shader_set()
+    for i = #calls, 1, -1 do
+        local c = calls[i]
+        if c[1] == "config" and c[2].decoration
+           and c[2].decoration.screen_shader ~= nil then
+            return c[2].decoration.screen_shader
+        end
+    end
+    return nil
+end
+
+function T.test_apply_night()
+    assert(core.apply("night"))
+    local sh = last_shader_set()
+    assert(sh and sh:match("merged%-"), "screen_shader devia apontar ao composto")
+    assert(exec_count("set%-property.*Temperature") > 0, "gamma não foi tocado")
+    local st = core.read_state()
+    assert(st.profile == "night" and st.temperature == 3600, "estado não gravado")
+end
+
+function T.test_overlay_preserva_perfil()
+    assert(core.apply("night"))
+    core.overlay("dim", 30)
+    local st = core.read_state()
+    assert(st.profile == "night" and st.dim == 30, "overlay perdeu o perfil")
+    local src = assert(io.open(last_shader_set())):read("*a")
+    assert(src:match("0%.3000"), "dim não entrou no shader")
+end
+
+function T.test_safe_reset_e_backup()
+    assert(core.apply("night"))
+    reset_calls()
+    core.safe_reset()
+    assert(last_shader_set() == "", "safe_reset devia limpar o shader")
+    local _, existed = core.read_state()
+    assert(not existed, "safe_reset devia arquivar o estado")
+    assert(io.open(core.state_file_path() .. ".bak"), "state.bak em falta")
+    -- recuperação
+    reset_calls()
+    core.restore_backup()
+    local st, ex2 = core.read_state()
+    assert(ex2 and st.profile == "night", "restore_backup devia repor night")
+    assert(last_shader_set():match("merged%-"), "e reaplicar o shader")
+end
+
+function T.test_restore_sem_estado_nao_faz_nada()
+    core.restore()
+    assert(#calls == 0, "restore sem estado não devia tocar em nada")
+end
+
+function T.test_apply_invalido_nao_rebenta()
+    local ok, err = core.apply("nao_existe")
+    assert(ok == false and err, "perfil inválido devia devolver false, err")
+end
+
+function T.test_tick_schedule_baseline()
+    local cfg = { schedule = { enabled = true, apply_on_start = false, slots = {
+        { name = "always", enabled = true, hour = 0, profile = "night" } } } }
+    local mem = {}
+    core.tick_schedule(cfg, mem)     -- primeiro tick: só regista
+    assert(mem.prev_slot == "always" and last_shader_set() == nil,
+           "primeiro tick não devia aplicar (apply_on_start=false)")
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end
