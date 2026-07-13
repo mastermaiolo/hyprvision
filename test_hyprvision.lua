@@ -96,6 +96,52 @@ function T.test_menu_index()
     assert(n == 10 and night and night.name == "Night", "índice do menu errado")
 end
 
+function T.test_compose()
+    local night = ROOT .. "/shaders/experience/night.glsl"
+    assert(core.compose(nil, "off", 0) == nil, "nada activo devia dar nil")
+
+    local merged = core.compose(night, "off", 0)
+    assert(merged and merged ~= night, "perfil puro tem de ser embrulhado (dither)")
+    local src = assert(io.open(merged)):read("*a")
+    assert(src:match("precision highp float;"), "highp obrigatório")
+    assert(src:match("_profile_main%(%)"), "main do perfil devia ser renomeado")
+    assert(src:match("_hash%(gl_FragCoord%.xy%)"), "dither em falta")
+    local _, nver = src:gsub("#version", "")
+    assert(nver == 1, "#version duplicado")
+
+    local m2 = core.compose(night, "medium", 30)
+    local s2 = assert(io.open(m2)):read("*a")
+    assert(s2:match("0%.0520"), "intensidade paper errada")
+    assert(s2:match("0%.3000"), "intensidade dim errada")
+
+    local dim_only = core.compose(nil, "off", 20)
+    assert(dim_only and assert(io.open(dim_only)):read("*a"):match("0%.2000"))
+end
+
+function T.test_shader_animated()
+    assert(core.shader_is_animated("uniform float time;\nvoid main(){}"))
+    assert(not core.shader_is_animated("void main(){}"))
+end
+
+function T.test_glsl_valido()
+    -- todos os shaders do repo + compostos, via glslangValidator
+    local function check(path)
+        local p = io.popen("glslangValidator -S frag '" .. path .. "' 2>&1")
+        local out = p:read("*a"); local ok = p:close()
+        assert(ok, "GLSL inválido: " .. path .. "\n" .. out)
+    end
+    local p = io.popen("find '" .. ROOT .. "/shaders' -name '*.glsl'")
+    local n = 0
+    for f in p:lines() do check(f); n = n + 1 end
+    p:close()
+    local night = ROOT .. "/shaders/experience/night.glsl"
+    for _, lvl in ipairs({ "light", "medium", "heavy" }) do
+        check(core.compose(night, lvl, 30)); n = n + 1
+    end
+    check(core.compose(night, "off", 0)); n = n + 1
+    print(("  (%d shaders GLSL validados)"):format(n))
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end

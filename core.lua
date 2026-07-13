@@ -65,6 +65,149 @@ function M.write_state(st)
     os.rename(tmp, M.state_file_path())   -- escrita atómica
 end
 
+-- ── Compose de shaders ───────────────────────────────────────────────
+M.PAPER_INTENSITY = { off = 0.0, light = 0.028, medium = 0.052, heavy = 0.085 }
+
+-- linhas globais do perfil que o wrapper re-declara
+local GLOBAL_PATTERNS = {
+    "^%s*#version", "^%s*precision%s", "^%s*in%s+vec2%s+v_texcoord",
+    "^%s*varying%s+vec2%s+v_texcoord", "^%s*layout%s*%(.-%)%s*out%s+vec4%s+fragColor",
+    "^%s*out%s+vec4%s+fragColor", "^%s*uniform%s+sampler2D%s+tex",
+}
+
+function M.shader_is_animated(src)
+    return src:match("uniform%s+float%s+time") ~= nil
+end
+
+local function strip_globals(src)
+    local out = {}
+    for line in (src .. "\n"):gmatch("(.-)\n") do
+        local global = false
+        for _, pat in ipairs(GLOBAL_PATTERNS) do
+            if line:match(pat) then global = true break end
+        end
+        if not global then out[#out + 1] = line end
+    end
+    return table.concat(out, "\n")
+end
+
+local WRAPPER = [[
+#version 300 es
+// HyprVision 5 · Shader Composto (gerado automaticamente)
+// perfil=@NAME@  paper=@PAPER@  dim=@DIMPCT@%
+// highp obrigatório: perfis usam ruído que excede fp16 (mediump em
+// Mesa/AMD) → NaN → ecrã preto.
+precision highp float;
+in vec2 v_texcoord;
+layout(location = 0) out vec4 fragColor;
+uniform sampler2D tex;
+
+// Hash sem seno (Dave Hoskins) — sem artefactos diagonais nem overflow.
+float _hash(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float _paperNoise(vec2 p) {
+    vec2 ip = floor(p);
+    vec2 fp = fract(p);
+    fp = fp * fp * (3.0 - 2.0 * fp);
+    float a = _hash(ip);
+    float b = _hash(ip + vec2(1.0, 0.0));
+    float c = _hash(ip + vec2(0.0, 1.0));
+    float d = _hash(ip + vec2(1.0, 1.0));
+    return mix(mix(a, b, fp.x), mix(c, d, fp.x), fp.y);
+}
+
+vec4 _fc;
+
+@PROFILE_BODY@
+
+void main() {
+    _fc = texture(tex, v_texcoord);
+
+    // Camada 1: Perfil base
+@PROFILE_CALL@
+
+    // Camada 2: Paper Texture (superfície e-ink)
+    float _pi = @PI@;
+    if (_pi > 0.001) {
+        // Grão em duas oitavas — 2ª rodada ~37° para quebrar a grelha
+        float _g1 = _paperNoise(v_texcoord * 700.0);
+        float _g2 = _paperNoise(mat2(0.8, -0.6, 0.6, 0.8) * v_texcoord * 1400.0 + vec2(0.37, 0.63));
+        // Mottling de baixa frequência — manchas da polpa
+        float _m  = _paperNoise(v_texcoord * 90.0 + vec2(7.13, 3.71));
+        // Fibras horizontais subtis (anisotropia do papel)
+        float _fib = _paperNoise(vec2(v_texcoord.x * 110.0, v_texcoord.y * 900.0));
+        float _tex = (_g1 * 0.55 + _g2 * 0.25 + _m * 0.45 + _fib * 0.35) - 0.80;
+
+        float _lum  = dot(_fc.rgb, vec3(0.2126, 0.7152, 0.0722));
+        float _mask = 0.55 + _lum * 0.45;
+        // Ganho 3.5 calibrado visualmente (~7/255 rms no heavy)
+        _fc.rgb += _tex * _pi * 3.5 * _mask;
+
+        // Papel nunca é preto puro: lift quente das sombras
+        vec3  _paperTint = vec3(1.0, 0.97, 0.90) * (0.045 + _m * 0.025);
+        float _shadow    = 1.0 - smoothstep(0.0, 0.18, _lum);
+        _fc.rgb = mix(_fc.rgb, _paperTint, min(_pi * 4.0, 0.4) * _shadow);
+
+        _fc.r += _g1 * _pi * 0.10;
+        _fc.b -= _g1 * _pi * 0.18;
+    }
+
+    // Camada 3: Extra Dim
+    _fc.rgb *= (1.0 - @DA@);
+
+    // Camada 4: dither ~1 LSB — mata banding das curvas na saída 8-bit
+    _fc.rgb += vec3(_hash(gl_FragCoord.xy) - 0.5) / 255.0;
+
+    fragColor = vec4(clamp(_fc.rgb, 0.0, 1.0), _fc.a);
+}
+]]
+
+local merged_seq = 0
+
+function M.compose(shader_abs, paper, dim)
+    paper = paper or "off"; dim = dim or 0
+    local pi = M.PAPER_INTENSITY[paper] or 0.0
+    local da = dim / 100.0
+    if not shader_abs and pi <= 0 and dim <= 0 then return nil end
+
+    local body, call, name = "", "", "none"
+    if shader_abs then
+        local f = assert(io.open(shader_abs), "shader não existe: " .. shader_abs)
+        local raw = f:read("*a"); f:close()
+        name = shader_abs:match("([^/]+)$")
+        local b = strip_globals(raw)
+        -- %f[%w] = fronteira de palavra (equivalente ao \b do v4)
+        b = b:gsub("%f[%w]gl_FragColor%f[%W]", "_fc")
+        b = b:gsub("%f[%w]fragColor%f[%W]", "_fc")
+        b = b:gsub("%f[%w]texture2D%f[%W]", "texture")
+        b = b:gsub("void%s+main%s*%(%s*%)", "void _profile_main()")
+        body, call = b, "    _profile_main();"
+    end
+
+    local src = WRAPPER
+        :gsub("@NAME@",  function() return name end)
+        :gsub("@PAPER@", function() return paper end)
+        :gsub("@DIMPCT@", function() return tostring(dim) end)
+        :gsub("@PROFILE_BODY@", function() return body end)
+        :gsub("@PROFILE_CALL@", function() return call end)
+        :gsub("@PI@", function() return string.format("%.4f", pi) end)
+        :gsub("@DA@", function() return string.format("%.4f", da) end)
+
+    merged_seq = merged_seq + 1
+    local path = ("%s/merged-%d-%d.glsl"):format(M.runtime, os.time(), merged_seq)
+    local f = assert(io.open(path, "w"))
+    f:write(src); f:close()
+    -- limpa compostos antigos (só os nossos)
+    os.execute(("find '%s' -name 'merged-*.glsl' ! -name '%s' -delete")
+               :format(M.runtime, path:match("([^/]+)$")))
+    M._animated = M.shader_is_animated(src)
+    return path
+end
+
 -- ── Perfis ───────────────────────────────────────────────────────────
 function M.load_profile(id)
     if not id or id == "" then return nil, "perfil vazio" end
