@@ -2,9 +2,11 @@
 
 [🇵🇹 Português](README.md) · [🇬🇧 English](README.en.md) · 🇨🇳 **简体中文**
 
-<p align="center"><img src="assets/profile_transition.gif" alt="HyprVision 菜单中配置切换的效果" width="480"></p>
+<p align="center"><img src="assets/banner.png" alt="HyprVision —— 清晰、对比与色彩，为你的合成器量身调校"></p>
 
 **Hyprland 原生视觉体验管理器** —— 用 GLSL 着色器实现色彩配置、色温/亮度/伽马调节、ICC 配置文件，以及可叠加的效果层，全部通过一个 Rofi 菜单操作。完全运行在合成器自带的 Lua 运行时里：不需要后台服务，不需要 Python。
+
+<p align="center"><img src="assets/profile_transition.gif" alt="HyprVision 菜单中配置切换的效果" width="480"></p>
 
 ## 目录
 

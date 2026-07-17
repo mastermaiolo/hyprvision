@@ -2,9 +2,11 @@
 
 [🇵🇹 Português](README.md) · 🇬🇧 **English** · [🇨🇳 简体中文](README.zh.md)
 
-<p align="center"><img src="assets/profile_transition.gif" alt="Switching profiles in the HyprVision menu" width="480"></p>
+<p align="center"><img src="assets/banner.png" alt="HyprVision — clarity, contrast and colour, tuned to your compositor"></p>
 
 **Native visual-ergonomics manager for Hyprland** — colour profiles with GLSL shaders, gamma/temperature/brightness, ICC profiles and composable overlays, all behind a Rofi menu. Runs entirely inside the compositor's Lua runtime: no daemon, no Python.
+
+<p align="center"><img src="assets/profile_transition.gif" alt="Switching profiles in the HyprVision menu" width="480"></p>
 
 ## Contents
 
