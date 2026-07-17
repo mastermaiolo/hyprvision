@@ -18,7 +18,7 @@
 - **Adaptive, no daemon**: profile switching by time of day and battery state (with automatic restore of the previous profile) via native `hl.timer`
 - **Real persistence**: profiles survive `hyprctl reload` — the Lua runtime is recreated and `init.lua` restores state on load
 - **Community extra shaders**: the `shaders/extras/` folder is wired into the menu
-- **Rofi menu in 3 languages** (English, Portuguese, 中文, picked from the system locale) and following the current tonal colour: if you run [Caelestia](https://github.com/caelestia-dots/shell), the menu automatically follows your wallpaper's Material palette
+- **Rofi menu in 3 languages** (English, Portuguese, 中文, picked from the system locale, or pinned via `config.lua`) and following the current tonal colour: if you run [Caelestia](https://github.com/caelestia-dots/shell), the menu automatically follows your wallpaper's Material palette
 - **Recoverable emergency reset** (`Super+Shift+H`): returns the screen to neutral and archives state to `state.bak` — the menu gains a "Recover last state" entry
 - **Smooth transitions** for temperature/brightness/gamma via wl-gammarelay-rs (started on demand)
 
@@ -83,6 +83,7 @@ The current state is always readable at `~/.config/hypr/hyprvision/state/state` 
 
 `~/.config/hypr/hyprvision/config.lua` — keybinds, schedules and battery. After editing: `hyprctl reload`. In any event, `profile = "none"` means "do nothing". Highlights:
 
+- `language` — `"auto"` (follows the system locale) or `"en"`/`"pt"`/`"zh"` to pin the Rofi menu's language
 - `battery.restore_after_low` — on recovering from low battery, automatically returns to whichever profile was active
 - `schedule.apply_on_start` — defaults to `false`: startup respects your last profile; schedules only fire once the clock crosses a slot
 - Slots accept `minute` in addition to `hour`
