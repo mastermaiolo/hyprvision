@@ -218,6 +218,17 @@ function T.test_overlay_preserva_perfil()
     assert(src:match("0%.3000"), "dim não entrou no shader")
 end
 
+function T.test_apply_reset_limpa_overlays()
+    assert(core.apply("night"))
+    core.overlay("paper", "medium")
+    core.overlay("dim", 30)
+    assert(core.apply("reset"))
+    local st = core.read_state()
+    assert(st.paper == "off" and st.dim == 0,
+           "perfil reset devia limpar paper/dim, ficou paper=" .. st.paper
+           .. " dim=" .. st.dim)
+end
+
 function T.test_safe_reset_e_backup()
     assert(core.apply("night"))
     reset_calls()

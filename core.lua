@@ -406,6 +406,8 @@ function M.apply(id)
     st.temperature = prof.temperature or 6500
     st.brightness  = prof.brightness or 1.0
     st.gamma       = prof.gamma or 1.0
+    if prof.paper then st.paper = prof.paper end
+    if prof.dim   then st.dim   = prof.dim   end
     apply_visuals(st)
     M.write_state(st)
     M.notify(prof.icon .. " " .. prof.name)
