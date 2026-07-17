@@ -47,6 +47,22 @@ declare -A T=(
 )
 t() { printf -- "${T[$L:$1]}" "${2:-}"; }
 
+# ── nomes dos perfis traduzidos (inglês usa o nome tal como vem do profiles.menu) ─
+declare -A PNAME=(
+    [pt:cinema_desktop]="Cinema Desktop"    [zh:cinema_desktop]="影院桌面"
+    [pt:cinema_film]="Cinema Filme"         [zh:cinema_film]="电影胶片"
+    [pt:cinema_oled]="Cinema OLED"          [zh:cinema_oled]="影院 OLED"
+    [pt:cinema_oled_warm]="Cinema OLED Quente" [zh:cinema_oled_warm]="暖色影院 OLED"
+    [pt:eink]="E-Ink"                       [zh:eink]="电子墨水"
+    [pt:eink_warm_dark]="E-Ink Quente e Escuro" [zh:eink_warm_dark]="暖色电子墨水"
+    [pt:focus]="Foco"                       [zh:focus]="专注模式"
+    [pt:night]="Noite"                      [zh:night]="夜间模式"
+    [pt:paper]="Papel"                      [zh:paper]="纸质"
+    [pt:paper_soft]="Papel Suave"           [zh:paper_soft]="柔和纸质"
+    [pt:reset]="Reset"                      [zh:reset]="重置"
+    [pt:tn_recovery]="Recuperação TN"       [zh:tn_recovery]="TN 面板修复"
+)
+
 PROFILE=$(sv profile reset); EXTRA=$(sv extra); PAPER=$(sv paper off); DIM=$(sv dim 0)
 STATUS="◈ ${EXTRA:-$PROFILE}"
 [[ "$PAPER" != "off" ]] && STATUS="$STATUS  📄$PAPER"
@@ -107,6 +123,7 @@ main_rows() {
             last_cat="$cat"
         fi
         mark=""; [[ "$id" == "$PROFILE" && -z "$EXTRA" ]] && mark="  ✓"
+        name="${PNAME[$L:$id]:-$name}"
         dim_row "$icon $name$mark" "$id"
     done < "$MENU_IDX"
 

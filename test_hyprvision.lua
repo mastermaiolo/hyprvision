@@ -382,6 +382,47 @@ function T.test_uninstall_limpa_o_hyprland_lua()
            "uninstall.sh devia ter removido a pasta instalada")
 end
 
+function T.test_nomes_de_perfil_traduzidos()
+    local sand = TMP .. "/launcher_pname"
+    os.execute(("mkdir -p '%s/ui' '%s/state' '%s/rofi' '%s/fakebin'")
+               :format(sand, sand, sand, sand))
+    os.execute(("cp '%s/ui/launcher.sh' '%s/ui/'"):format(ROOT, sand))
+    os.execute(("touch '%s/rofi/hyprvision.rasi'"):format(sand))
+    local st = assert(io.open(sand .. "/state/state", "w"))
+    st:write("profile=reset\nshader=\nicc=\nextra=\npaper=off\ndim=0\n" ..
+             "temperature=6500\nbrightness=1.0\ngamma=1.0\n")
+    st:close()
+    local mi = assert(io.open(sand .. "/state/profiles.menu", "w"))
+    mi:write("night\t🌙\tNight\texperience\nreset\t⚡\tReset\tsystem\n")
+    mi:close()
+    -- rofi falso: só grava as linhas do menu e não escolhe nada (sai logo)
+    local fk = assert(io.open(sand .. "/fakebin/rofi", "w"))
+    fk:write(("#!/usr/bin/env bash\ncat > '%s/menu_dump.txt'\n"):format(sand)); fk:close()
+    fk = assert(io.open(sand .. "/fakebin/hyprctl", "w"))
+    fk:write("#!/usr/bin/env bash\necho ok\n"); fk:close()
+    fk = assert(io.open(sand .. "/fakebin/notify-send", "w"))
+    fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
+    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
+
+    local function dump_with(lang)
+        os.execute(("rm -f '%s/menu_dump.txt'"):format(sand))
+        assert(os.execute(("LANG=%s PATH='%s/fakebin':$PATH bash '%s/ui/launcher.sh'")
+                          :format(lang, sand, sand)),
+               "launcher saiu com erro")
+        return assert(io.open(sand .. "/menu_dump.txt")):read("*a")
+    end
+
+    local pt = dump_with("pt_PT.UTF-8")
+    assert(pt:match("Noite"), "locale pt devia mostrar o nome do perfil traduzido:\n" .. pt)
+    assert(not pt:match("Night"), "locale pt não devia mostrar o nome em inglês:\n" .. pt)
+
+    local zh = dump_with("zh_CN.UTF-8")
+    assert(zh:match("夜间模式"), "locale zh devia mostrar o nome do perfil traduzido:\n" .. zh)
+
+    local en = dump_with("en_GB.UTF-8")
+    assert(en:match("Night"), "locale en devia manter o nome original:\n" .. en)
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end
