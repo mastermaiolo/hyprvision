@@ -121,7 +121,7 @@ mkdir -p "$DEST"
 rsync -a --delete \
     --exclude 'state/' --exclude '.git/' --exclude 'docs/' \
     --exclude 'install.sh' --exclude 'uninstall.sh' \
-    --exclude 'test_hyprvision.lua' --exclude 'README.md' --exclude 'CHANGELOG.md' \
+    --exclude 'test_hyprvision.lua' --exclude 'README*.md' --exclude 'CHANGELOG.md' \
     --exclude 'config.lua' \
     "$SRC"/ "$DEST"/
 chmod +x "$DEST/ui/launcher.sh"

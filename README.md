@@ -1,8 +1,12 @@
 # HyprVision
 
+🇵🇹 **Português** · [🇬🇧 English](README.en.md) · [🇨🇳 简体中文](README.zh.md)
+
 **Gestor de ergonomia visual nativo do Hyprland** — perfis de cor com shaders GLSL, gamma/temperatura/brightness, perfis ICC e overlays compostáveis, tudo num menu Rofi. Corre inteiro dentro do runtime Lua do compositor: sem daemon, sem Python.
 
-> Lua-native visual profile manager for Hyprland ≥ 0.55: GLSL screen shaders, gamma control, ICC profiles and composable overlays behind a Rofi menu. Docs in Portuguese.
+## Índice
+
+[Funcionalidades](#funcionalidades) · [Perfis incluídos](#perfis-incluídos) · [Requisitos](#requisitos) · [Instalação](#instalação) · [Uso](#uso) · [Configuração](#configuração) · [Criar um perfil](#criar-um-perfil) · [Resolução de problemas](#resolução-de-problemas) · [Arquitectura](#arquitectura) · [Créditos](#créditos) · [Licença](#licença)
 
 ## Funcionalidades
 
@@ -45,7 +49,7 @@
 ## Instalação
 
 ```bash
-git clone <este-repo> && cd hyprvision
+git clone https://github.com/mastermaiolo/hyprvision && cd hyprvision
 ./install.sh
 ```
 
@@ -140,3 +144,9 @@ Fontes citadas dentro dos próprios shaders:
 *(o `HyprWindowShade` do ManofJELLO é um plugin C++ que aplica shaders por-janela — não a origem literal dos 3 ficheiros aqui, mas é o projeto de shaders dele que temos à mão.)*
 
 Obrigado a todos. Se és autor de um destes shaders e queres correção de atribuição, licença ou remoção, abre uma issue.
+
+## Licença
+
+MIT — ver [LICENSE](LICENSE). Os shaders de terceiros em `shaders/extras/` mantêm os seus próprios termos, indicados nos Créditos acima.
+
+Histórico de versões: [CHANGELOG.md](CHANGELOG.md).
