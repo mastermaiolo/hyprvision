@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# HyprVision 5 · Instalador (Hyprland ≥ 0.55 com config hyprland.lua)
+# HyprVision · Instalador (Hyprland ≥ 0.55 com config hyprland.lua)
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$HOME/.config/hypr/hyprvision"
 HYPRLUA="$HOME/.config/hypr/hyprland.lua"
 
-echo "── HyprVision 5 · instalação ──"
+echo "── HyprVision · instalação ──"
 [[ -f "$HYPRLUA" ]] || {
     echo "✗ $HYPRLUA não existe. O v5 requer config Lua (parser non-legacy)."
     echo "  Para hyprland.conf clássico usa a v4 (tag v4.1.0)."
@@ -34,7 +34,7 @@ echo "✓ Ficheiros em $DEST (config.lua e state/ preservados)"
 # apagar só o require v4 deixaria o package.path antigo a enganar checks de grep
 sed -i -e '/hyprvision/d' -e '/^-- HyprVision/d' -e '/require("init")/d' "$HYPRLUA"
 cat >> "$HYPRLUA" <<'LUA'
--- HyprVision 5
+-- HyprVision
 package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/hypr/hyprvision/?.lua"
 require("init")
 LUA

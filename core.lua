@@ -1,4 +1,4 @@
--- HyprVision 5 · core.lua — motor: estado, perfis, compose, apply.
+-- HyprVision · core.lua — motor: estado, perfis, compose, apply.
 -- Sem dependência directa de `hl`: recebe-o via setup() para ser
 -- testável fora do compositor (lua5.4 test_hyprvision.lua).
 local M = {}
@@ -93,7 +93,7 @@ end
 
 local WRAPPER = [[
 #version 300 es
-// HyprVision 5 · Shader Composto (gerado automaticamente)
+// HyprVision · Shader Composto (gerado automaticamente)
 // perfil=@NAME@  paper=@PAPER@  dim=@DIMPCT@%
 // highp obrigatório: perfis usam ruído que excede fp16 (mediump em
 // Mesa/AMD) → NaN → ecrã preto.

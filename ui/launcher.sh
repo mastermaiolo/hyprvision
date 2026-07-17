@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HyprVision 5 · Launcher Rofi
+# HyprVision · Launcher Rofi
 # Lê o estado de state/state (o `hyprctl eval` não devolve output — o
 # ficheiro é a interface de leitura) e envia acções via hyprctl eval.
 set -euo pipefail

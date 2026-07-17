@@ -1,4 +1,4 @@
--- HyprVision 5 · init.lua — wiring no Hyprland (≥ 0.55, config Lua).
+-- HyprVision · init.lua — wiring no Hyprland (≥ 0.55, config Lua).
 -- O runtime Lua é recriado em cada reload, por isso este ficheiro corre
 -- sempre fresco: binds, timers e restore sem duplicações. O install.sh
 -- acrescenta ao hyprland.lua:

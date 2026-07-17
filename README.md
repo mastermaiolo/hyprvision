@@ -1,4 +1,4 @@
-# HyprVision 5
+# HyprVision
 
 **Gestor de ergonomia visual nativo do Hyprland** — perfis de cor com shaders GLSL, gamma/temperatura/brightness, perfis ICC e overlays compostáveis, tudo num menu Rofi. Corre inteiro dentro do runtime Lua do compositor: sem daemon, sem Python.
 
@@ -24,11 +24,13 @@
 | ✨ Cinema Desktop | correction | Microcontraste suave para uso geral |
 | 🖥️ TN Recovery | correction | Compensação de painéis TN lavados |
 | 🌌 Cinema OLED | experience | Pretos esmagados a zero + vibrance seletivo — look OLED num LCD |
+| 🧡 Cinema OLED Warm | experience | Cinema OLED com temperatura quente — filmes à noite sem cansar a vista |
 | 🎬 Cinema Film | experience | Curva S, vinheta e grão de filme |
 | 📖 E-Ink | experience | Dessaturação estilo tinta eletrónica (combina com Paper Texture) |
 | 🎯 Focus | experience | Concentração, distrações atenuadas |
 | 🌙 Night | experience | Noite, quente e escuro |
-| 📄 Paper / 🌿 Paper Soft | experience | Papel envelhecido para leitura e escrita |
+| 📄 Paper | experience | Papel envelhecido para leitura e escrita |
+| 🌿 Paper Soft | experience | Paper ainda mais quente e suave, para sessões longas |
 | ⚡ Reset | system | Tudo neutro |
 
 ## Requisitos
