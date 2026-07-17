@@ -116,4 +116,19 @@ O `hyprctl eval` não devolve output, por isso o Lua mantém `state/state` e `st
 
 ## Créditos
 
-Os shaders em `shaders/extras/` pertencem aos seus autores originais (0x15BA88FF, ManofJELLO, Sijan-Bhusal, snes19xx), com ajustes mínimos de compatibilidade (`highp`). Obrigado!
+Os shaders em `shaders/extras/` são da comunidade Hyprland — mantidos como recebidos, só com ajustes mínimos de compatibilidade (`highp`, ver nota acima). Autoria original:
+
+| Autor | Shaders |
+|---|---|
+| **[snes19xx](https://github.com/snes19xx)** | cinema, clarity_inefficient, crt_mode, focus, fuji_acros, gameboy, IBM5151, main, matte, night, night_vision, outdoor, reading_mode, soft, vhs |
+| **0x15BA88FF** | chromatic_abberation, colors, contrast, crt, extradark, grain, invert, retro, solarized |
+| **Sijan-Bhusal** | amoled, blue-light-filter, cyberpunk, matrix, retro |
+| **ManofJELLO** | chromaGlitch, pixelate, wireframe |
+
+Fontes citadas dentro dos próprios shaders:
+- `0x15BA88FF_crt.frag` — © 2023 Maxim Samoliuk, licença MIT (aviso completo no topo do ficheiro)
+- `0x15BA88FF_colors.glsl` — baseado numa [discussão no repo do Hyprland](https://github.com/hyprwm/Hyprland/issues/1140#issuecomment-1614863627) e no [Vibrance.fx do SweetFX](https://github.com/CeeJayDK/SweetFX/blob/a792aee788c6203385a858ebdea82a77f81c67f0/Shaders/Vibrance.fx#L20-L30)
+- `0x15BA88FF_retro.glsl` — versão modificada de [wessles/GLSL-CRT](https://github.com/wessles/GLSL-CRT/blob/master/shader.frag)
+- `0x15BA88FF_extradark.frag` — valores adaptados de uma [thread no fórum do ReShade](https://reshade.me/forum/shader-discussion/3673-blue-light-filter-similar-to-f-lux)
+
+Obrigado a todos. Se és autor de um destes shaders e queres correção de atribuição, licença ou remoção, abre uma issue.
