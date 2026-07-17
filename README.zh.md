@@ -18,7 +18,7 @@
 - **无后台服务的自适应**：按时间和电池状态自动切换配置（并在恢复后自动还原之前的配置），通过 Hyprland 原生的 `hl.timer` 实现
 - **真正的持久化**：配置在 `hyprctl reload` 后依然保留 —— Lua 运行时会重建，`init.lua` 会在加载时恢复状态
 - **社区提供的额外着色器**：`shaders/extras/` 文件夹已接入菜单
-- **菜单支持 3 种语言**（英语、葡萄牙语、中文，根据系统语言自动选择，也可以在 `config.lua` 里固定语言），并会跟随当前的主题色：如果你在用 [Caelestia](https://github.com/caelestia-dots/shell)，菜单会自动跟随你壁纸生成的 Material 配色
+- **菜单支持 3 种语言**（英语、葡萄牙语、中文，根据系统语言自动选择），并会跟随当前的主题色：如果你在用 [Caelestia](https://github.com/caelestia-dots/shell)，菜单会自动跟随你壁纸生成的 Material 配色
 - **可恢复的紧急重置**（`Super+Shift+H`）：把屏幕恢复到中性状态，并把当前状态存档到 `state.bak` —— 菜单里会出现"恢复上一个状态"
 - **平滑过渡**：色温/亮度/伽马的变化通过 wl-gammarelay-rs 实现平滑过渡（按需启动）
 
@@ -83,7 +83,6 @@ hyprctl eval "hv.restore_backup()"         恢复存档的状态
 
 `~/.config/hypr/hyprvision/config.lua` —— 快捷键、日程和电池设置。编辑后执行：`hyprctl reload`。在任何事件里，`profile = "none"` 表示"什么都不做"。要点：
 
-- `language` —— `"auto"`（跟随系统语言）或 `"en"`/`"pt"`/`"zh"`，可以固定 Rofi 菜单的语言
 - `battery.restore_after_low` —— 电池电量恢复后，会自动切回电量不足前正在使用的配置
 - `schedule.apply_on_start` —— 默认是 `false`：开机时保留你上次的配置；日程只在时间跨过某个时间点时才会触发
 - 时间段除了 `hour` 之外还支持 `minute`

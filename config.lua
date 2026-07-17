@@ -2,7 +2,6 @@
 -- Editar e correr `hyprctl reload` para aplicar.
 -- Em "profile": id de um perfil (ver profiles/) ou "none" para não agir.
 return {
-    language = "auto",  -- "auto" (segue o locale do sistema) | "en" | "pt" | "zh"
     keys = {
         menu  = "SUPER + H",         -- abre o menu Rofi
         reset = "SUPER + SHIFT + H", -- reset de emergência

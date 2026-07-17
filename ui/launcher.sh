@@ -20,18 +20,11 @@ hv() {   # invoca a superfície Lua
     hyprctl eval "hv.$1" >/dev/null
 }
 
-# ── i18n: config.lua (language=) força; senão, locale do sistema ────────
-LANG_CFG="$(grep -m1 '^\s*language\s*=' "$BASE_DIR/config.lua" 2>/dev/null \
-            | sed -E 's/.*=\s*"([^"]*)".*/\1/' || true)"
-case "$LANG_CFG" in
-    en|pt|zh) L="$LANG_CFG" ;;
-    *)
-        case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
-            zh*) L=zh ;;
-            pt*) L=pt ;;
-            *)   L=en ;;
-        esac
-        ;;
+# ── i18n: en / pt / zh a partir do locale do sistema, en por omissão ────
+case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
+    zh*) L=zh ;;
+    pt*) L=pt ;;
+    *)   L=en ;;
 esac
 declare -A T=(
     [en:cat_correction]="CORRECTION"          [pt:cat_correction]="CORREÇÃO"           [zh:cat_correction]="校正"

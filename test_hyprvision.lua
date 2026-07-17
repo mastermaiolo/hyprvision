@@ -382,39 +382,6 @@ function T.test_uninstall_limpa_o_hyprland_lua()
            "uninstall.sh devia ter removido a pasta instalada")
 end
 
-function T.test_launcher_language_override()
-    local sand = TMP .. "/launcher_lang"
-    os.execute(("mkdir -p '%s/ui' '%s/state' '%s/rofi' '%s/fakebin'")
-               :format(sand, sand, sand, sand))
-    os.execute(("cp '%s/ui/launcher.sh' '%s/ui/'"):format(ROOT, sand))
-    os.execute(("touch '%s/rofi/hyprvision.rasi'"):format(sand))
-    local cfg = assert(io.open(sand .. "/config.lua", "w"))
-    cfg:write('return {\n    language = "en",\n    keys = {},\n}\n'); cfg:close()
-    local st = assert(io.open(sand .. "/state/state", "w"))
-    st:write("profile=reset\nshader=\nicc=\nextra=\npaper=medium\ndim=0\n" ..
-             "temperature=6500\nbrightness=1.0\ngamma=1.0\n")
-    st:close()
-    local mi = assert(io.open(sand .. "/state/profiles.menu", "w"))
-    mi:write("reset\t⚡\tReset\tsystem\n")
-    mi:close()
-    -- rofi falso: só grava as linhas do menu e não escolhe nada (sai logo)
-    local fk = assert(io.open(sand .. "/fakebin/rofi", "w"))
-    fk:write(("#!/usr/bin/env bash\ncat > '%s/menu_dump.txt'\n"):format(sand)); fk:close()
-    fk = assert(io.open(sand .. "/fakebin/hyprctl", "w"))
-    fk:write("#!/usr/bin/env bash\necho ok\n"); fk:close()
-    fk = assert(io.open(sand .. "/fakebin/notify-send", "w"))
-    fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
-    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
-
-    -- locale do sistema é português, mas config.lua força inglês
-    local rc = os.execute(("LANG=pt_PT.UTF-8 PATH='%s/fakebin':$PATH bash '%s/ui/launcher.sh'")
-                          :format(sand, sand))
-    assert(rc, "launcher saiu com erro")
-    local dump = assert(io.open(sand .. "/menu_dump.txt")):read("*a")
-    assert(dump:match("Paper Texture"), "language=\"en\" devia forçar inglês:\n" .. dump)
-    assert(not dump:match("Textura de Papel"), "não devia usar português com language=\"en\"")
-end
-
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end
