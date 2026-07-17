@@ -43,6 +43,7 @@ declare -A T=(
     [en:config_title]="Config"                [pt:config_title]="Configuração"         [zh:config_title]="配置"
     [en:config_manual]="Edit manually: %s"    [pt:config_manual]="Edita manualmente: %s" [zh:config_manual]="请手动编辑: %s"
     [en:config_saved]="After saving: hyprctl reload" [pt:config_saved]="Após guardar: hyprctl reload" [zh:config_saved]="保存后执行: hyprctl reload"
+    [en:search_placeholder]="search profile..."      [pt:search_placeholder]="pesquisar perfil..."   [zh:search_placeholder]="搜索配置..."
 )
 t() { printf -- "${T[$L:$1]}" "${2:-}"; }
 
@@ -85,7 +86,9 @@ RASI
 rofi_menu() {
     local dyn=(); local d; d="$(dynamic_theme)"
     [[ -n "$d" ]] && dyn=(-theme-str "$d")
-    rofi -dmenu -p "$1" -theme "$ROFI_THEME" "${dyn[@]}" -no-custom -markup-rows -format s
+    rofi -dmenu -p "$1" -theme "$ROFI_THEME" \
+        -theme-str "entry { placeholder: \"$(t search_placeholder)\"; }" \
+        "${dyn[@]}" -no-custom -markup-rows -format s
 }
 pick_id()   { grep -o '\[[^]]*\]' | tail -1 | tr -d '[]'; }
 dim_row()   { printf '%s   <span alpha="30%%" size="small">[%s]</span>\n' "$1" "$2"; }
