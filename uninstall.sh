@@ -15,8 +15,7 @@ if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
 fi
 
 if [[ -f "$HYPRLUA" ]]; then
-    sed -i '/hyprvision/d' "$HYPRLUA"
-    sed -i '/^-- HyprVision/d' "$HYPRLUA"
+    sed -i -e '/hyprvision/d' -e '/^-- HyprVision/d' -e '/require("init")/d' "$HYPRLUA"
     echo "✓ require removido do hyprland.lua"
 fi
 

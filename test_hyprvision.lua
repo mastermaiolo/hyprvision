@@ -351,6 +351,37 @@ function T.test_installer_modo_manual_e_eof()
            "sem resposta devia desligar o schedule (omissão segura)")
 end
 
+function T.test_uninstall_limpa_o_hyprland_lua()
+    local sand = TMP .. "/uninstall"
+    os.execute(("mkdir -p '%s/home/.config/hypr' '%s/fakebin'"):format(sand, sand))
+    os.execute(("touch '%s/home/.config/hypr/hyprland.lua'"):format(sand))
+    for _, b in ipairs({ "rofi", "wl-gammarelay-rs", "notify-send", "hyprctl", "paru" }) do
+        local fk = assert(io.open(sand .. "/fakebin/" .. b, "w"))
+        fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
+    end
+    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
+
+    local env = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 HOME='%s/home'")
+                :format(sand, sand)
+    -- instala (modo manual, sem conflitos de atalho) e confirma que o require lá está
+    assert(os.execute(("printf '1\\n' | %s bash '%s/install.sh' >'%s/out.log' 2>&1")
+                       :format(env, ROOT, sand)),
+           "install.sh saiu com erro")
+    local hyprlua_path = sand .. "/home/.config/hypr/hyprland.lua"
+    local before = assert(io.open(hyprlua_path)):read("*a")
+    assert(before:match('require%("init"%)'), "install.sh devia ter deixado o require(\"init\")")
+
+    assert(os.execute(("%s bash '%s/uninstall.sh' >'%s/out.log' 2>&1"):format(env, ROOT, sand)),
+           "uninstall.sh saiu com erro")
+    local after = assert(io.open(hyprlua_path)):read("*a")
+    assert(not after:match('require%("init"%)'),
+           "uninstall.sh devia ter removido o require(\"init\"):\n" .. after)
+    assert(not after:match("[Hh]yprvision"),
+           "uninstall.sh devia ter removido todas as referências a hyprvision:\n" .. after)
+    assert(not os.execute(("test -d '%s/home/.config/hypr/hyprvision'"):format(sand)),
+           "uninstall.sh devia ter removido a pasta instalada")
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end
