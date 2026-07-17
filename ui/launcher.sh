@@ -20,6 +20,32 @@ hv() {   # invoca a superfície Lua
     hyprctl eval "hv.$1" >/dev/null
 }
 
+# ── i18n: en / pt / zh a partir do locale do sistema, en por omissão ────
+case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
+    zh*) L=zh ;;
+    pt*) L=pt ;;
+    *)   L=en ;;
+esac
+declare -A T=(
+    [en:cat_correction]="CORRECTION"          [pt:cat_correction]="CORREÇÃO"           [zh:cat_correction]="校正"
+    [en:cat_experience]="EXPERIENCE"          [pt:cat_experience]="EXPERIÊNCIA"        [zh:cat_experience]="体验"
+    [en:cat_system]="SYSTEM"                  [pt:cat_system]="SISTEMA"                [zh:cat_system]="系统"
+    [en:overlays]="OVERLAYS & EXTRAS"         [pt:overlays]="OVERLAYS E EXTRAS"        [zh:overlays]="叠加层与附加效果"
+    [en:paper_texture]="Paper Texture"        [pt:paper_texture]="Textura de Papel"    [zh:paper_texture]="纸质纹理"
+    [en:extra_dim]="Extra Dim"                [pt:extra_dim]="Escurecimento Extra"     [zh:extra_dim]="额外调暗"
+    [en:extra_shaders]="Extra Shaders"        [pt:extra_shaders]="Shaders Extra"       [zh:extra_shaders]="额外着色器"
+    [en:recover]="Recover last state"         [pt:recover]="Recuperar último estado"   [zh:recover]="恢复上一个状态"
+    [en:edit_config]="Edit configuration"     [pt:edit_config]="Editar configuração"   [zh:edit_config]="编辑配置"
+    [en:back]="Back"                          [pt:back]="Voltar"                       [zh:back]="返回"
+    [en:extras_empty]="Extras folder is empty.\n\nPut .glsl files in:\n%s"
+    [pt:extras_empty]="Pasta extras vazia.\n\nColoca .glsl em:\n%s"
+    [zh:extras_empty]="额外资源文件夹是空的。\n\n把 .glsl 文件放到:\n%s"
+    [en:config_title]="Config"                [pt:config_title]="Configuração"         [zh:config_title]="配置"
+    [en:config_manual]="Edit manually: %s"    [pt:config_manual]="Edita manualmente: %s" [zh:config_manual]="请手动编辑: %s"
+    [en:config_saved]="After saving: hyprctl reload" [pt:config_saved]="Após guardar: hyprctl reload" [zh:config_saved]="保存后执行: hyprctl reload"
+)
+t() { printf -- "${T[$L:$1]}" "${2:-}"; }
+
 PROFILE=$(sv profile reset); EXTRA=$(sv extra); PAPER=$(sv paper off); DIM=$(sv dim 0)
 STATUS="◈ ${EXTRA:-$PROFILE}"
 [[ "$PAPER" != "off" ]] && STATUS="$STATUS  📄$PAPER"
@@ -35,9 +61,9 @@ main_rows() {
     while IFS=$'\t' read -r id icon name cat; do
         if [[ "$cat" != "$last_cat" ]]; then
             case "$cat" in
-                correction) sep "🔧 CORRECTION" ;;
-                experience) sep "🎭 EXPERIENCE" ;;
-                system)     sep "⚙️  SYSTEM" ;;
+                correction) sep "🔧 $(t cat_correction)" ;;
+                experience) sep "🎭 $(t cat_experience)" ;;
+                system)     sep "⚙️  $(t cat_system)" ;;
                 *)          sep "$cat" ;;
             esac
             last_cat="$cat"
@@ -46,18 +72,18 @@ main_rows() {
         dim_row "$icon $name$mark" "$id"
     done < "$MENU_IDX"
 
-    sep "🧩 OVERLAYS · EXTRAS"
+    sep "🧩 $(t overlays)"
     local pm=""; [[ "$PAPER" != "off" ]] && pm="  ✓"
-    dim_row "📄 Paper Texture: $PAPER  ▸$pm" "__paper__"
+    dim_row "📄 $(t paper_texture): $PAPER  ▸$pm" "__paper__"
     local dm=""; [[ "$DIM" != "0" ]] && dm="  ✓"
-    dim_row "🔅 Extra Dim: ${DIM}%  ▸$dm" "__dim__"
+    dim_row "🔅 $(t extra_dim): ${DIM}%  ▸$dm" "__dim__"
     local em=""; [[ -n "$EXTRA" ]] && em="  ✓"
-    dim_row "🌐 Shaders extra${EXTRA:+: $EXTRA}  ▸$em" "__extras__"
-    [[ -f "$STATE.bak" ]] && dim_row "↩ Recuperar último estado" "__recover__"
-    dim_row "📝 Editar configuração" "__config__"
+    dim_row "🌐 $(t extra_shaders)${EXTRA:+: $EXTRA}  ▸$em" "__extras__"
+    [[ -f "$STATE.bak" ]] && dim_row "↩ $(t recover)" "__recover__"
+    dim_row "📝 $(t edit_config)" "__config__"
 }
 
-back_row() { dim_row "↩ Voltar" "__back__"; }
+back_row() { dim_row "↩ $(t back)" "__back__"; }
 
 choice=$(main_rows | rofi_menu "$STATUS") || exit 0
 [[ -z "$choice" ]] && exit 0
@@ -72,7 +98,7 @@ case "$ID" in
                 for lvl in off light medium heavy; do
                     mark=""; [[ "$lvl" == "$PAPER" ]] && mark="  ✓"
                     dim_row "📄 $lvl$mark" "$lvl"
-                done; } | rofi_menu "📄 Paper Texture" | pick_id) || true
+                done; } | rofi_menu "📄 $(t paper_texture)" | pick_id) || true
         [[ -z "${SEL:-}" ]] && exit 0
         if [[ "$SEL" == "__back__" ]]; then exec "$0"; fi
         hv "overlay('paper', '$SEL')"
@@ -82,7 +108,7 @@ case "$ID" in
                 for lvl in 0 10 20 30 40 50; do
                     mark=""; [[ "$lvl" == "$DIM" ]] && mark="  ✓"
                     dim_row "🔅 $lvl%$mark" "$lvl"
-                done; } | rofi_menu "🔅 Extra Dim" | pick_id) || true
+                done; } | rofi_menu "🔅 $(t extra_dim)" | pick_id) || true
         [[ -z "${SEL:-}" ]] && exit 0
         if [[ "$SEL" == "__back__" ]]; then exec "$0"; fi
         hv "overlay('dim', $SEL)"
@@ -92,15 +118,14 @@ case "$ID" in
         mapfile -t EXTRAS < <(find "$EXTRAS_DIR" \( -name "*.glsl" -o -name "*.frag" \) \
             -printf "%f\n" 2>/dev/null | sort)
         if ((${#EXTRAS[@]} == 0)); then
-            rofi -e "Pasta extras vazia.\n\nColoca .glsl em:\n$EXTRAS_DIR" \
-                -theme "$ROFI_THEME" || true
+            rofi -e "$(t extras_empty "$EXTRAS_DIR")" -theme "$ROFI_THEME" || true
             exit 0
         fi
         SEL=$({ back_row
                 for f in "${EXTRAS[@]}"; do
                     mark=""; [[ "$f" == "$EXTRA" ]] && mark="  ✓"
                     dim_row "🌐 ${f%.*}$mark" "$f"
-                done; } | rofi_menu "🌐 Shaders extra" | pick_id) || true
+                done; } | rofi_menu "🌐 $(t extra_shaders)" | pick_id) || true
         [[ -z "${SEL:-}" ]] && exit 0
         if [[ "$SEL" == "__back__" ]]; then exec "$0"; fi
         hv "apply_extra('$SEL')"
@@ -118,7 +143,7 @@ case "$ID" in
         done
         if [[ -z "$EDITOR_CMD" ]]; then
             xdg-open "$CONFIG" 2>/dev/null || \
-                notify-send -a HyprVision "Config" "Edita manualmente: $CONFIG"
+                notify-send -a HyprVision "$(t config_title)" "$(t config_manual "$CONFIG")"
         else
             case "${EDITOR_CMD%% *}" in
                 code|gedit|kate) $EDITOR_CMD "$CONFIG" & disown ;;
@@ -134,7 +159,7 @@ case "$ID" in
                     fi ;;
             esac
         fi
-        notify-send -a HyprVision "Config" "Após guardar: hyprctl reload"
+        notify-send -a HyprVision "$(t config_title)" "$(t config_saved)"
         ;;
     *)
         hv "apply('$ID')"
