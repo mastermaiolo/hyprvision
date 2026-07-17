@@ -119,7 +119,7 @@ pkill -f hyprvision-daemon 2>/dev/null || true
 
 mkdir -p "$DEST"
 rsync -a --delete \
-    --exclude 'state/' --exclude '.git/' --exclude 'docs/' \
+    --exclude 'state/' --exclude '.git/' --exclude 'docs/' --exclude 'assets/' \
     --exclude 'install.sh' --exclude 'uninstall.sh' \
     --exclude 'test_hyprvision.lua' --exclude 'README*.md' --exclude 'CHANGELOG.md' \
     --exclude 'config.lua' \

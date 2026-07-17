@@ -2,6 +2,8 @@
 
 🇵🇹 **Português** · [🇬🇧 English](README.en.md) · [🇨🇳 简体中文](README.zh.md)
 
+<p align="center"><img src="assets/profile_transition.gif" alt="Transição entre perfis no menu HyprVision" width="480"></p>
+
 **Gestor de ergonomia visual nativo do Hyprland** — perfis de cor com shaders GLSL, gamma/temperatura/brightness, perfis ICC e overlays compostáveis, tudo num menu Rofi. Corre inteiro dentro do runtime Lua do compositor: sem daemon, sem Python.
 
 ## Índice
