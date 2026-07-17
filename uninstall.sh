@@ -23,4 +23,4 @@ fi
 rm -rf "$DEST"
 rm -rf "${XDG_RUNTIME_DIR:-/tmp}/hyprvision"
 echo "✓ $DEST removido"
-echo "── Feito. `hyprctl reload` para largar os binds desta sessão. ──"
+echo "── Feito. \`hyprctl reload\` para largar os binds desta sessão. ──"
