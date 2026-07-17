@@ -1,5 +1,27 @@
 # Changelog
 
+## v5.1.0 — 2026-07-17
+
+Publicação no GitHub: internacionalização, instalador interativo e documentação em 3 idiomas.
+
+### Adicionado
+- **Menu Rofi em 3 idiomas** (inglês, português, 中文), pelo locale do sistema — inclui os nomes dos perfis e o placeholder de pesquisa, não só o texto de UI.
+- **Menu Rofi segue a cor tonal actual do Caelestia**: lê o `scheme.json` Material gerado a partir do wallpaper e sobrepõe a paleta estática via `-theme-str`.
+- **Instalador interativo** (inglês/中文): verifica e oferece instalar dependências em falta (pacman/apt/dnf; AUR via paru/yay para o wl-gammarelay-rs); deteta conflitos de atalho em `Super+H`/`Super+Shift+H` via `hyprctl binds` e deixa escolher outra tecla; pergunta entre troca manual de perfil ou automática por horário (dia/noite).
+- **Licença MIT** (`LICENSE`) e créditos revistos, com tabela por autor e links para os projectos originais dos shaders da comunidade.
+- Perfis **Cinema OLED Warm** e **E-Ink Warm Dark**.
+- **README em português, inglês e 中文**, com índice, GIF de demonstração e secção de licença.
+- Self-check ampliado: testes para o instalador (modo automático/manual, EOF seguro), o desinstalador, e a tradução de nomes de perfis.
+
+### Corrigido
+- **Reset** também limpa os overlays de Paper Texture e Extra Dim (antes só limpava perfil/shader/extra, deixando overlays "pendurados").
+- **`install.sh` sobrescrevia `config.lua`** a cada reinstalação — o filtro `protect` do rsync só impede apagar, não sobrescrever; `config.lua` passa a ficheiro excluído do rsync.
+- **`uninstall.sh` deixava um `require("init")` órfão** no `hyprland.lua`, fazendo o Hyprland reclamar módulo em falta a cada reload.
+- **`uninstall.sh` executava `hyprctl reload` por acidente**: crases não escapadas dentro de aspas duplas disparam substituição de comando mesmo lá dentro.
+
+### Alterado
+- Nome do projecto passa a **"HyprVision"** (sem número de versão no nome — o "5" fica só nas entradas deste changelog).
+
 ## v5.0.0 — 2026-07-13
 
 Reescrita Lua-nativa. O HyprVision passa a viver dentro do Hyprland.
