@@ -56,7 +56,7 @@ end
 
 function T.test_profiles_carregam_todos()
     local all = core.list_profiles()
-    assert(#all == 11, "esperava 11 perfis, tenho " .. #all)
+    assert(#all == 12, "esperava 12 perfis, tenho " .. #all)
     local ids = {}
     for _, p in ipairs(all) do
         ids[p.id] = true
@@ -93,7 +93,7 @@ function T.test_menu_index()
         if id == "night" then night = { icon = icon, name = name } end
     end
     f:close()
-    assert(n == 11 and night and night.name == "Night", "índice do menu errado")
+    assert(n == 12 and night and night.name == "Night", "índice do menu errado")
 end
 
 function T.test_compose()

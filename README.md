@@ -27,6 +27,7 @@
 | 🧡 Cinema OLED Warm | experience | Cinema OLED com temperatura quente — filmes à noite sem cansar a vista |
 | 🎬 Cinema Film | experience | Curva S, vinheta e grão de filme |
 | 📖 E-Ink | experience | Dessaturação estilo tinta eletrónica (combina com Paper Texture) |
+| 🕯️ E-Ink Warm Dark | experience | E-Ink quente e escuro — Kindle sob luz de vela, pretos mais profundos |
 | 🎯 Focus | experience | Concentração, distrações atenuadas |
 | 🌙 Night | experience | Noite, quente e escuro |
 | 📄 Paper | experience | Papel envelhecido para leitura e escrita |
