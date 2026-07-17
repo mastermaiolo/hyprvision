@@ -296,6 +296,61 @@ function T.test_launcher_smoke()
            "launcher devia invocar hv.apply('night'); log:\n" .. log)
 end
 
+function T.test_installer_modo_automatico()
+    local sand = TMP .. "/installer_auto"
+    os.execute(("mkdir -p '%s/home/.config/hypr' '%s/fakebin'"):format(sand, sand))
+    os.execute(("touch '%s/home/.config/hypr/hyprland.lua'"):format(sand))
+    for _, b in ipairs({ "rofi", "wl-gammarelay-rs", "notify-send", "hyprctl", "paru" }) do
+        local fk = assert(io.open(sand .. "/fakebin/" .. b, "w"))
+        fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
+    end
+    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
+
+    -- modo 2 (automático): dia = perfil 7 (focus) às 8h, noite = perfil 8 (night) às 21h
+    local run = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 " ..
+                 "HOME='%s/home' bash '%s/install.sh' >'%s/out.log' 2>&1")
+    assert(os.execute(("printf '2\\n7\\n8\\n8\\n21\\n' | " ..
+                        run):format(sand, sand, ROOT, sand)),
+           "install.sh (modo automático) saiu com erro")
+
+    local cfg_path = sand .. "/home/.config/hypr/hyprvision/config.lua"
+    local cfg = assert(io.open(cfg_path)):read("*a")
+    assert(cfg:match('name = "day",%s+enabled = true, hour = 8, profile = "focus"'),
+           "slot de dia em falta no config.lua:\n" .. cfg)
+    assert(cfg:match('name = "night",%s+enabled = true, hour = 21, profile = "night"'),
+           "slot de noite em falta no config.lua")
+    assert(cfg:match("apply_on_start = true,"), "apply_on_start devia ficar true")
+
+    -- reinstalação: não deve voltar a perguntar nem tocar num config.lua já personalizado
+    os.execute(("sed -i 's/menu  = \"SUPER + H\"/menu  = \"SUPER + M\"/' '%s'"):format(cfg_path))
+    assert(os.execute((run .. " </dev/null"):format(sand, sand, ROOT, sand)),
+           "reinstalação saiu com erro")
+    local cfg2 = assert(io.open(cfg_path)):read("*a")
+    assert(cfg2:match('menu  = "SUPER %+ M"'),
+           "reinstalação devia preservar o config.lua personalizado")
+end
+
+function T.test_installer_modo_manual_e_eof()
+    local sand = TMP .. "/installer_manual"
+    os.execute(("mkdir -p '%s/home/.config/hypr' '%s/fakebin'"):format(sand, sand))
+    os.execute(("touch '%s/home/.config/hypr/hyprland.lua'"):format(sand))
+    for _, b in ipairs({ "rofi", "wl-gammarelay-rs", "notify-send", "hyprctl", "paru" }) do
+        local fk = assert(io.open(sand .. "/fakebin/" .. b, "w"))
+        fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
+    end
+    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
+
+    -- stdin fechado: nunca deve travar, tem de cair no modo manual por omissão
+    local run = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=zh_CN.UTF-8 " ..
+                 "HOME='%s/home' bash '%s/install.sh' </dev/null >'%s/out.log' 2>&1")
+    assert(os.execute(run:format(sand, sand, ROOT, sand)),
+           "install.sh com stdin fechado devia terminar sem erro")
+
+    local cfg = assert(io.open(sand .. "/home/.config/hypr/hyprvision/config.lua")):read("*a")
+    assert(cfg:match("schedule = {%s+enabled = false,"),
+           "sem resposta devia desligar o schedule (omissão segura)")
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end

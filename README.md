@@ -48,7 +48,12 @@ git clone <este-repo> && cd hyprvision
 ./install.sh
 ```
 
-O instalador copia para `~/.config/hypr/hyprvision`, acrescenta o `require("init")` ao `hyprland.lua` e recarrega o Hyprland — fica logo activo. Correr de novo actualiza sem perder `config.lua` nem estado.
+O instalador é interativo (inglês ou 中文, conforme o locale do sistema) e, numa instalação de raiz, também:
+- verifica rofi, wl-gammarelay-rs e libnotify, e oferece-se para instalar o que faltar (pacman/apt/dnf; AUR via paru/yay para o wl-gammarelay-rs);
+- se `Super+H` ou `Super+Shift+H` já estiverem ocupados por outro atalho, deixa escolher uma tecla diferente;
+- pergunta se queres trocar de perfil manualmente ou automaticamente por horário (um perfil de dia, outro de noite).
+
+Depois disso, copia para `~/.config/hypr/hyprvision`, acrescenta o `require("init")` ao `hyprland.lua` e recarrega o Hyprland — fica logo activo. Correr de novo actualiza sem voltar a perguntar nem perder `config.lua` ou estado.
 
 Para desinstalar (repõe o ecrã e remove tudo): `./uninstall.sh`.
 
