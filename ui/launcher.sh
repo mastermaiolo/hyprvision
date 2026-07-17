@@ -51,7 +51,42 @@ STATUS="◈ ${EXTRA:-$PROFILE}"
 [[ "$PAPER" != "off" ]] && STATUS="$STATUS  📄$PAPER"
 [[ "$DIM" != "0" ]] && STATUS="$STATUS  🔅$DIM%"
 
-rofi_menu() { rofi -dmenu -p "$1" -theme "$ROFI_THEME" -no-custom -markup-rows -format s; }
+# ── cor tonal actual (Caelestia): sobrepõe a paleta estática do .rasi ────
+SCHEME_JSON="$HOME/.local/state/caelestia/scheme.json"
+
+scheme_color() {   # $1=campo do scheme.json → hex de 6 dígitos, ou nada se não existir
+    [[ -f "$SCHEME_JSON" ]] || return
+    sed -n "s/.*\"$1\": *\"\([0-9a-fA-F]\{6\}\)\".*/\1/p" "$SCHEME_JSON" | head -1
+}
+
+dynamic_theme() {   # bloco -theme-str com as cores do esquema actual, ou "" se não houver Caelestia
+    local primary; primary="$(scheme_color primary)"
+    [[ -n "$primary" ]] || return
+    local background surf_hi surf on_bg on_surf_var outline_var on_primary error
+    background="$(scheme_color background)"
+    surf_hi="$(scheme_color surfaceContainerHigh)"
+    surf="$(scheme_color surfaceContainer)"
+    on_bg="$(scheme_color onBackground)"
+    on_surf_var="$(scheme_color onSurfaceVariant)"
+    outline_var="$(scheme_color outlineVariant)"
+    on_primary="$(scheme_color onPrimary)"
+    error="$(scheme_color error)"
+    cat <<RASI
+* {
+    bg0: #${background}F2; bg1: #${surf_hi}; bg2: #${surf}80; bg3: #${primary}F2;
+    fg0: #${on_bg}; fg2: #${on_surf_var}; fg3: #${outline_var}; sep: #${outline_var};
+}
+window { border-color: #${primary}33; }
+element.selected.normal, element.selected.active { text-color: #${on_primary}; }
+error-message { border-color: #${error}F2; }
+RASI
+}
+
+rofi_menu() {
+    local dyn=(); local d; d="$(dynamic_theme)"
+    [[ -n "$d" ]] && dyn=(-theme-str "$d")
+    rofi -dmenu -p "$1" -theme "$ROFI_THEME" "${dyn[@]}" -no-custom -markup-rows -format s
+}
 pick_id()   { grep -o '\[[^]]*\]' | tail -1 | tr -d '[]'; }
 dim_row()   { printf '%s   <span alpha="30%%" size="small">[%s]</span>\n' "$1" "$2"; }
 sep()       { printf '<span alpha="55%%" style="italic">──  %s  ──</span>\n' "$1"; }
@@ -118,7 +153,8 @@ case "$ID" in
         mapfile -t EXTRAS < <(find "$EXTRAS_DIR" \( -name "*.glsl" -o -name "*.frag" \) \
             -printf "%f\n" 2>/dev/null | sort)
         if ((${#EXTRAS[@]} == 0)); then
-            rofi -e "$(t extras_empty "$EXTRAS_DIR")" -theme "$ROFI_THEME" || true
+            dyn=(); d="$(dynamic_theme)"; [[ -n "$d" ]] && dyn=(-theme-str "$d")
+            rofi -e "$(t extras_empty "$EXTRAS_DIR")" -theme "$ROFI_THEME" "${dyn[@]}" || true
             exit 0
         fi
         SEL=$({ back_row

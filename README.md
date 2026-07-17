@@ -14,6 +14,7 @@
 - **Adaptativo sem daemon**: perfil por horário e por estado da bateria (com recuperação automática do perfil anterior) via `hl.timer` nativo
 - **Persistência real**: os perfis sobrevivem a `hyprctl reload` — o runtime Lua é recriado e o `init.lua` restaura o estado ao carregar
 - **Shaders extra da comunidade**: pasta `shaders/extras/` integrada no menu
+- **Menu Rofi em 3 idiomas** (inglês, português, 中文, pelo locale do sistema) e com a cor tonal actual: se corres [Caelestia](https://github.com/caelestia-dots/shell), o menu segue automaticamente a paleta Material do teu wallpaper
 - **Reset de emergência recuperável** (`Super+Shift+H`): repõe o ecrã neutro e arquiva o estado em `state.bak` — o menu ganha "Recuperar último estado"
 - **Transições suaves** de temperatura/brightness/gamma via wl-gammarelay-rs (arranque on-demand)
 
