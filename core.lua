@@ -68,12 +68,19 @@ end
 -- ── Compose de shaders ───────────────────────────────────────────────
 M.PAPER_INTENSITY = { off = 0.0, light = 0.028, medium = 0.052, heavy = 0.085 }
 
--- linhas globais do perfil que o wrapper re-declara
+-- linhas globais do perfil que o wrapper re-declara. Qualificador de
+-- precisão opcional (alguns shaders da comunidade escrevem
+-- "in highp vec2 v_texcoord" em vez de "in vec2 v_texcoord") — sem isto
+-- a linha não é reconhecida como global e duplica a declaração do wrapper.
 local GLOBAL_PATTERNS = {
-    "^%s*#version", "^%s*precision%s", "^%s*in%s+vec2%s+v_texcoord",
-    "^%s*varying%s+vec2%s+v_texcoord", "^%s*layout%s*%(.-%)%s*out%s+vec4%s+fragColor",
-    "^%s*out%s+vec4%s+fragColor", "^%s*uniform%s+sampler2D%s+tex",
+    "^%s*#version", "^%s*precision%s",
+    "^%s*layout%s*%(.-%)%s*out%s+vec4%s+fragColor", "^%s*out%s+vec4%s+fragColor",
 }
+for _, q in ipairs({ "", "highp%s+", "mediump%s+", "lowp%s+" }) do
+    GLOBAL_PATTERNS[#GLOBAL_PATTERNS + 1] = "^%s*in%s+" .. q .. "vec2%s+v_texcoord"
+    GLOBAL_PATTERNS[#GLOBAL_PATTERNS + 1] = "^%s*varying%s+" .. q .. "vec2%s+v_texcoord"
+    GLOBAL_PATTERNS[#GLOBAL_PATTERNS + 1] = "^%s*uniform%s+" .. q .. "sampler2D%s+tex"
+end
 
 function M.shader_is_animated(src)
     return src:match("uniform%s+float%s+time") ~= nil

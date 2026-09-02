@@ -142,6 +142,26 @@ function T.test_glsl_valido()
     print(("  (%d shaders GLSL validados)"):format(n))
 end
 
+function T.test_extras_compoem_sem_conflito()
+    -- os extras são cada um um shader completo e independente (não passam
+    -- por profiles/*.lua), por isso o teste acima não os compõe — validar
+    -- só a versão crua não apanha declarações globais duplicadas
+    local function check(path)
+        local p = io.popen("glslangValidator -S frag '" .. path .. "' 2>&1")
+        local out = p:read("*a"); local ok = p:close()
+        assert(ok, "extra quebra ao compor: " .. path .. "\n" .. out)
+    end
+    local p = io.popen("find '" .. ROOT .. "/shaders/extras' -name '*.glsl' -o -name '*.frag'")
+    local n = 0
+    for f in p:lines() do
+        check(core.compose(f, "off", 0))
+        n = n + 1
+    end
+    p:close()
+    assert(n > 0, "pasta extras vazia — teste não verificou nada")
+    print(("  (%d extras validados após compose)"):format(n))
+end
+
 function T.test_schedule_wrap()
     local slots = {
         { name = "dawn",  enabled = true, hour = 6,  profile = "reset" },
