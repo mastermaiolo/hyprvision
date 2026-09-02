@@ -197,6 +197,9 @@ function M.compose(shader_abs, paper, dim)
         :gsub("@PI@", function() return string.format("%.4f", pi) end)
         :gsub("@DA@", function() return string.format("%.4f", da) end)
 
+    -- tmpfs às vezes é limpo por fora (systemd-tmpfiles, etc.) muito depois
+    -- do setup() inicial — recria sempre, é barato
+    os.execute("mkdir -p '" .. M.runtime .. "'")
     merged_seq = merged_seq + 1
     local path = ("%s/merged-%d-%d.glsl"):format(M.runtime, os.time(), merged_seq)
     local f = assert(io.open(path, "w"))

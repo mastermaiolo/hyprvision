@@ -8,6 +8,9 @@ uniform sampler2D tex;
 
 void main() {
     vec4 color = texture(tex, v_texcoord);
+    // Crush antes do resto — a compressão de altos abaixo tem slope >1 na
+    // origem e sozinha lava os pretos em vez de só cortar o pico
+    color.rgb = pow(color.rgb, vec3(1.3));
     color.b *= 0.55;
     color.g *= 0.90;
     color.rgb *= 0.82;
