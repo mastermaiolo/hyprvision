@@ -1,6 +1,6 @@
 # HyprVision
 
-[🇵🇹 Português](README.md) · [🇬🇧 English](README.en.md) · 🇨🇳 **简体中文**
+[🇵🇹 Português](README.pt.md) · [🇬🇧 English](README.md) · 🇨🇳 **简体中文**
 
 <p align="center"><img src="assets/banner.png" alt="HyprVision —— 清晰、对比与色彩，为你的合成器量身调校"></p>
 
