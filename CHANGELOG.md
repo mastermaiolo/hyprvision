@@ -1,5 +1,17 @@
 # Changelog
 
+## v5.1.1 — 2026-09-02
+
+Correções de perfis e shaders extras; README em inglês passa a ser o padrão.
+
+### Corrigido
+- **Night lavava os pretos**: a compressão de altos tinha *slope* > 1 na origem e amplificava tons quase pretos em vez de os manter ancorados. Adicionado um crush (`pow(color, 1.3)`) antes do resto da curva.
+- **Pasta de runtime (tmpfs) podia desaparecer sozinha** (ex.: limpeza do `systemd-tmpfiles`) muito depois do arranque, fazendo `apply()` falhar silenciosamente. `core.lua` recria-a a cada composição de shader, não só uma vez no `setup()`.
+- **Shaders extras com qualificador de precisão explícito** (`highp`/`mediump`/`lowp` em `in vec2 v_texcoord` ou `uniform sampler2D tex`) quebravam o compositor ao serem selecionados — a linha não era reconhecida como global do wrapper e duplicava a declaração. Afetava pelo menos o `chromatic_abberation.glsl`. Self-check ampliado: `test_extras_compoem_sem_conflito` compõe todos os extras (não só valida os shaders crus).
+
+### Alterado
+- **`README.md` (idioma por omissão no GitHub) passa a inglês** — português move para `README.pt.md`, chinês mantém-se em `README.zh.md`. Descrição do repositório no GitHub também traduzida para inglês.
+
 ## v5.1.0 — 2026-07-17
 
 Publicação no GitHub: internacionalização, instalador interativo e documentação em 3 idiomas.
