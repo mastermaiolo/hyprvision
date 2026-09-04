@@ -16,7 +16,7 @@ declare -A T=(
     [en:no_hyprlua]="✗ %s not found. HyprVision needs the Lua config (hyprland.lua)." [zh:no_hyprlua]="✗ 找不到 %s。HyprVision 需要 Lua 配置文件 (hyprland.lua)。"
     [en:no_hyprlua_hint]="  For the classic hyprland.conf, use v4 (tag v4.1.0) instead." [zh:no_hyprlua_hint]="  如果你用旧版 hyprland.conf，请改用 v4（tag v4.1.0）。"
     [en:files_copied]="✓ Files installed to %s (config.lua and state/ kept)"     [zh:files_copied]="✓ 文件已安装到 %s（保留 config.lua 和 state/）"
-    [en:require_ok]="✓ require added to hyprland.lua"                           [zh:require_ok]="✓ 已在 hyprland.lua 中添加 require"
+    [en:require_ok]="✓ require added to %s"                                     [zh:require_ok]="✓ 已在 %s 中添加 require"
     [en:reloaded]="✓ Hyprland reloaded — HyprVision is active"                  [zh:reloaded]="✓ Hyprland 已重新加载 — HyprVision 已启用"
     [en:done]="── Done. Menu: %s · Reset: %s ──"                                 [zh:done]="── 完成。菜单：%s · 重置：%s ──"
 
@@ -255,15 +255,28 @@ if (( CONFIG_IS_NEW )); then
     fi
 fi
 
-# remove qualquer bloco HyprVision anterior (v4 ou v5) e recria — idempotente;
-# apagar só o require v4 deixaria o package.path antigo a enganar checks de grep
+# onde ligar o require: hyprland.lua normalmente, mas em Ryoku (e em qualquer
+# setup que semeie um user.lua nunca tocado por updates) esse ficheiro é o
+# baseline shipped do sistema — um `ryoku update`/materialize reescreve-o e
+# apaga o require sem aviso (os ficheiros do HyprVision continuam em disco, só
+# o require desaparece). user.lua sobrevive a isso, por isso é preferido
+# quando existe.
+WIREFILE="$HYPRLUA"
+[[ -f "$HOME/.config/hypr/user.lua" ]] && WIREFILE="$HOME/.config/hypr/user.lua"
+
+# remove qualquer bloco HyprVision anterior — formato antigo (v4/v5, sem
+# marcadores, só existiu em hyprland.lua) e o novo formato com marcadores
+# (pode estar em hyprland.lua ou em user.lua, conforme uma instalação
+# anterior o tenha posto) — e recria, idempotente
 sed -i -e '/hyprvision/d' -e '/^-- HyprVision/d' -e '/require("init")/d' "$HYPRLUA"
-cat >> "$HYPRLUA" <<'LUA'
--- HyprVision
+[[ -f "$WIREFILE" ]] && sed -i -e '/-- HyprVision >>>/,/-- HyprVision <<</d' "$WIREFILE"
+cat >> "$WIREFILE" <<'LUA'
+-- HyprVision >>>
 package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/hypr/hyprvision/?.lua"
 require("init")
+-- HyprVision <<<
 LUA
-echo "$(t require_ok)"
+echo "$(t require_ok "$(basename "$WIREFILE")")"
 
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
     hyprctl reload >/dev/null && echo "$(t reloaded)"

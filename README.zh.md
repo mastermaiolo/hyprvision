@@ -62,7 +62,7 @@ git clone https://github.com/mastermaiolo/hyprvision && cd hyprvision
 - 如果 `Super+H` 或 `Super+Shift+H` 已经被占用，可以让你选择别的按键；
 - 询问你想手动切换配置，还是按时间自动切换（一个白天配置，一个夜晚配置）。
 
-完成之后，会把文件复制到 `~/.config/hypr/hyprvision`，在 `hyprland.lua` 里加入 `require("init")`，并重新加载 Hyprland —— 马上就能用。再次运行会更新文件，但不会重新询问，也不会丢失 `config.lua` 或状态。
+完成之后，会把文件复制到 `~/.config/hypr/hyprvision`，在 `hyprland.lua` 里加入 `require("init")`（如果 `~/.config/hypr/user.lua` 已存在，则改为加到这个文件里，这样在模块化配置系统（例如 Ryoku）自身更新时 require 也不会丢失），并重新加载 Hyprland —— 马上就能用。再次运行会更新文件，但不会重新询问，也不会丢失 `config.lua` 或状态。
 
 卸载（恢复屏幕并删除所有文件）：`./uninstall.sh`。
 

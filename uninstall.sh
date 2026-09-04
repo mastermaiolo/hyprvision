@@ -14,9 +14,16 @@ if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
     echo "✓ Ecrã reposto ao neutro"
 fi
 
+WIREFILE="$HYPRLUA"
+[[ -f "$HOME/.config/hypr/user.lua" ]] && WIREFILE="$HOME/.config/hypr/user.lua"
+
 if [[ -f "$HYPRLUA" ]]; then
     sed -i -e '/hyprvision/d' -e '/^-- HyprVision/d' -e '/require("init")/d' "$HYPRLUA"
     echo "✓ require removido do hyprland.lua"
+fi
+if [[ -f "$WIREFILE" && "$WIREFILE" != "$HYPRLUA" ]]; then
+    sed -i -e '/-- HyprVision >>>/,/-- HyprVision <<</d' "$WIREFILE"
+    echo "✓ require removido do user.lua"
 fi
 
 rm -rf "$DEST"

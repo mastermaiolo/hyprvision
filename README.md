@@ -62,7 +62,7 @@ The installer is interactive (English or 中文, based on the system locale) and
 - if `Super+H` or `Super+Shift+H` are already bound to something else, lets you pick a different key;
 - asks whether you want to switch profiles manually or automatically by time of day (one day profile, one night profile).
 
-After that, it copies everything to `~/.config/hypr/hyprvision`, adds `require("init")` to `hyprland.lua` and reloads Hyprland — it's active right away. Running it again updates without asking again or losing `config.lua` or state.
+After that, it copies everything to `~/.config/hypr/hyprvision`, adds `require("init")` to `hyprland.lua` (or to `~/.config/hypr/user.lua` when that file already exists, so the require survives a modular setup's own config updates — e.g. Ryoku) and reloads Hyprland — it's active right away. Running it again updates without asking again or losing `config.lua` or state.
 
 To uninstall (resets the screen and removes everything): `./uninstall.sh`.
 

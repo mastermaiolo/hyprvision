@@ -402,6 +402,51 @@ function T.test_uninstall_limpa_o_hyprland_lua()
            "uninstall.sh devia ter removido a pasta instalada")
 end
 
+function T.test_install_prefere_user_lua_quando_existe()
+    local sand = TMP .. "/user_lua"
+    os.execute(("mkdir -p '%s/home/.config/hypr' '%s/fakebin'"):format(sand, sand))
+    os.execute(("touch '%s/home/.config/hypr/hyprland.lua'"):format(sand))
+    -- user.lua já existe (assinatura de setups modulares tipo Ryoku, onde
+    -- hyprland.lua é regenerado a partir de um baseline e user.lua não)
+    os.execute(("printf '%%s\\n' '-- user overrides' > '%s/home/.config/hypr/user.lua'"):format(sand))
+    for _, b in ipairs({ "rofi", "wl-gammarelay-rs", "notify-send", "hyprctl", "paru" }) do
+        local fk = assert(io.open(sand .. "/fakebin/" .. b, "w"))
+        fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
+    end
+    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
+
+    local env = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 HOME='%s/home'")
+                :format(sand, sand)
+    assert(os.execute(("printf '1\\n' | %s bash '%s/install.sh' >'%s/out.log' 2>&1")
+                       :format(env, ROOT, sand)),
+           "install.sh saiu com erro")
+
+    local hyprlua = assert(io.open(sand .. "/home/.config/hypr/hyprland.lua")):read("*a")
+    assert(not hyprlua:match('require%("init"%)'),
+           "install.sh não devia tocar no hyprland.lua quando user.lua existe:\n" .. hyprlua)
+    local user_path = sand .. "/home/.config/hypr/user.lua"
+    local userlua = assert(io.open(user_path)):read("*a")
+    assert(userlua:match("%-%- HyprVision >>>.*require%(\"init\"%).*%-%- HyprVision <<<"),
+           "install.sh devia ter ligado o require em user.lua entre marcadores:\n" .. userlua)
+    assert(userlua:match("^%-%- user overrides"),
+           "install.sh não devia apagar o conteúdo já existente em user.lua:\n" .. userlua)
+
+    -- reinstalação: idempotente, sem duplicar o bloco
+    assert(os.execute(("printf '1\\n' | %s bash '%s/install.sh' >'%s/out.log' 2>&1")
+                       :format(env, ROOT, sand)),
+           "reinstalação saiu com erro")
+    local _, n = (assert(io.open(user_path)):read("*a")):gsub("HyprVision >>>", "")
+    assert(n == 1, "reinstalação devia manter um único bloco HyprVision em user.lua")
+
+    assert(os.execute(("%s bash '%s/uninstall.sh' >'%s/out.log' 2>&1"):format(env, ROOT, sand)),
+           "uninstall.sh saiu com erro")
+    local after = assert(io.open(user_path)):read("*a")
+    assert(not after:match("[Hh]yprvision"),
+           "uninstall.sh devia ter limpo o bloco de user.lua:\n" .. after)
+    assert(after:match("^%-%- user overrides"),
+           "uninstall.sh não devia apagar o resto do user.lua:\n" .. after)
+end
+
 function T.test_nomes_de_perfil_traduzidos()
     local sand = TMP .. "/launcher_pname"
     os.execute(("mkdir -p '%s/ui' '%s/state' '%s/rofi' '%s/fakebin'")

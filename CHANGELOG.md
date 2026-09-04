@@ -1,5 +1,10 @@
 # Changelog
 
+## v5.1.2 — 2026-09-05
+
+### Corrigido
+- **O `require("init")` desaparecia sozinho após um reboot em sistemas com config Hyprland modular** (ex.: Ryoku): o instalador ligava-se acrescentando o `require` diretamente ao `hyprland.lua`, mas nesses sistemas esse ficheiro é regenerado a partir de um baseline (`ryoku update`/materialize e equivalentes), que o reescreve e apaga o `require` sem aviso — os ficheiros do HyprVision continuavam em `~/.config/hypr/hyprvision/`, só o link desaparecia. `install.sh`/`uninstall.sh` passam a preferir `~/.config/hypr/user.lua` como ponto de ligação quando ele existe (ficheiro que esses sistemas já garantem nunca ser tocado por updates), e o bloco passa a vir delimitado por `-- HyprVision >>>`/`<<<` para uma limpeza exata em qualquer dos dois ficheiros.
+
 ## v5.1.1 — 2026-09-02
 
 Correções de perfis e shaders extras; README em inglês passa a ser o padrão.
