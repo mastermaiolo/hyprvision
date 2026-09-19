@@ -1,0 +1,34 @@
+/* ══════════════════════════════════════════════════════════════════════
+   GlassTheme Rofi · Paleta Estática de Fallback
+   Baseada no sistema coherent-design (OKLCH, contraste verificado >= 4.5:1).
+   
+   Usada como fallback quando a ponte tonal dinâmica (Noctalia / Caelestia)
+   não estiver presente no ambiente.
+   ══════════════════════════════════════════════════════════════════════ */
+
+* {
+    /* 70% opacidade (#B3) no fundo: o limite físico do efeito de vidro.
+       Acima de ~85%, o blur do compositor vira uma mancha uniforme e perde
+       a sensação de vidro translúcido. */
+    bg0:        #0D0D10B3;   /* Fundo da janela (vidro funcional, 70%) */
+    bg1:        #1C1C21E6;   /* Elevação — inputbar, badges, chips de ícone (90%) */
+    bg2:        #18181C99;   /* Agrupamento secundário — categorias/mensagens (~60%) */
+    bg3:        #A18DEEF2;   /* Accent — cor de destaque primária (~95%) */
+    
+    fg0:        #F5F5F8;     /* Texto primário — 17.8:1 */
+    fg2:        #9E9EA3;     /* Texto secundário / placeholder — 7.3:1 */
+    fg3:        #6E6E74;     /* Terciário — decorativo / separadores */
+    
+    accent-fg:  #262626;     /* Texto legível sobre bg3 */
+    error:      #E97871F2;   /* Estado de erro / alerta — 6.8:1 */
+
+    /* Seleção sutil: o accent tingido a 12% (#1F), nunca um bloco sólido
+       que pesaria a hierarquia visual */
+    sel:        #A18DEE1F;
+    sep:        @fg3;
+    chip-bg:    #A18DEE24;   /* Container tonal (14%) para badges */
+    chip-fg:    @fg2;
+
+    /* Realce de vidro: luz captada na aresta superior */
+    rim-top:    #F5F5F838;
+}

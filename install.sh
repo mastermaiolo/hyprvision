@@ -20,6 +20,16 @@ declare -A T=(
     [en:reloaded]="✓ Hyprland reloaded — HyprVision is active"                  [zh:reloaded]="✓ Hyprland 已重新加载 — HyprVision 已启用"
     [en:done]="── Done. Menu: %s · Reset: %s ──"                                 [zh:done]="── 完成。菜单：%s · 重置：%s ──"
 
+    [en:noctalia_ok]="✓ Tonal colour bridge registered with Noctalia"           [zh:noctalia_ok]="✓ 已在 Noctalia 中注册色调桥接"
+    [en:noctalia_found]="✓ Tonal colour bridge already registered with Noctalia" [zh:noctalia_found]="✓ Noctalia 中已注册色调桥接"
+    [en:glass_found]="✓ Glass exception for the 'rofi' namespace already in place" [zh:glass_found]="✓ 'rofi' 命名空间的玻璃例外已就绪"
+    [en:glass_ask]="Layer-shell popups get no blur in Hyprland unless a layerrule targets their namespace — without it the glass theme renders as a flat, near-opaque panel. Add one for 'rofi' in windowrules.lua? [y/N] " \
+    [zh:glass_ask]="除非 layerrule 指定命名空间，Hyprland 不会对 layer-shell 弹窗应用模糊 — 没有它，玻璃主题会显示为扁平、近乎不透明的面板。要为 'rofi' 添加一条吗？[y/N] "
+    [en:glass_ok]="✓ Glass exception added to windowrules.lua"                  [zh:glass_ok]="✓ 已将玻璃例外添加到 windowrules.lua"
+    [en:glass_skip]="→ No exception — the menu uses the global blur as-is"      [zh:glass_skip]="→ 不添加例外 — 菜单沿用全局模糊"
+    [en:glass_manual]="Add this to your Hyprland config by hand to get real glass:" \
+    [zh:glass_manual]="请手动将以下内容添加到 Hyprland 配置中以获得真正的玻璃效果："
+
     [en:bind_conflict]="⚠ %s is already bound to something else."              [zh:bind_conflict]="⚠ %s 已经被绑定到别的功能。"
     [en:bind_prompt]="  New key to use instead (one letter, Enter keeps %s): "  [zh:bind_prompt]="  改用哪个键？（一个字母，回车保持 %s）："
 
@@ -277,6 +287,68 @@ require("init")
 -- HyprVision <<<
 LUA
 echo "$(t require_ok "$(basename "$WIREFILE")")"
+
+# ── cor tonal: registra o template no Noctalia, se instalado ────────────
+# O Noctalia re-renderiza theme/noctalia.rasi.tmpl sozinho a cada troca de
+# wallpaper/scheme e escreve o resultado no state dir; o launcher só lê o
+# ficheiro. Sem Noctalia, o launcher cai no Caelestia (scheme.json) e, sem
+# nenhum dos dois, na paleta estática do .rasi.
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/hyprvision"
+mkdir -p "$STATE_DIR"
+NOCTALIA_CONF="$HOME/.config/noctalia/config.toml"
+if [[ -f "$NOCTALIA_CONF" ]]; then
+    if grep -q "theme.templates.user.hyprvision" "$NOCTALIA_CONF" 2>/dev/null; then
+        echo "$(t noctalia_found)"
+    else
+        cat >> "$NOCTALIA_CONF" <<EOF
+
+    [theme.templates.user.hyprvision]
+    input_path = "$DEST/theme/noctalia.rasi.tmpl"
+    output_path = "$STATE_DIR/noctalia-colors.rasi"
+EOF
+        echo "$(t noctalia_ok)"
+    fi
+fi
+
+# ── vidro: layerrule para o namespace "rofi" ────────────────────────────
+# No Hyprland, um layer-shell popup não recebe blur por omissão — sem uma
+# regra explícita, o tema de vidro renderiza como painel quase opaco. A
+# regra é partilhada com o Hypr.AI (mesmo namespace), por isso se já
+# existir não duplicamos.
+GLASS_RULE='hl.layer_rule({ name = "rofi-glass", match = { namespace = "^rofi$" }, ignore_alpha = 0.2, blur = true, xray = false })'
+WINDOWRULES="$HOME/.config/hypr/config/windowrules.lua"
+if [[ -f "$WINDOWRULES" ]]; then
+    if grep -q 'namespace = "\^rofi\$"' "$WINDOWRULES" 2>/dev/null; then
+        echo "$(t glass_found)"
+    elif [[ -t 0 ]]; then
+        read -r -p "$(t glass_ask)" GLASS_ANS
+        case "$GLASS_ANS" in
+            [yY]*|[sS]*)
+                cat >> "$WINDOWRULES" <<'EOF'
+
+-- Rofi launchers (HyprVision, Hypr.AI): layer-shell popups get no blur by
+-- default in Hyprland unless a layerrule targets their namespace explicitly —
+-- without this, the glass theme renders as a flat, near-opaque panel.
+hl.layer_rule({
+  name = "rofi-glass",
+  match = { namespace = "^rofi$" },
+  ignore_alpha = 0.2,
+  blur = true,
+  xray = false,
+})
+EOF
+                echo "$(t glass_ok)"
+                ;;
+            *) echo "$(t glass_skip)" ;;
+        esac
+    else
+        echo "$(t glass_manual)"
+        printf '%s\n' "$GLASS_RULE"
+    fi
+else
+    echo "$(t glass_manual)"
+    printf '%s\n' "$GLASS_RULE"
+fi
 
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
     hyprctl reload >/dev/null && echo "$(t reloaded)"

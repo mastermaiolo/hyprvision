@@ -298,9 +298,12 @@ function T.test_launcher_smoke()
     local mi = assert(io.open(sand .. "/state/profiles.menu", "w"))
     mi:write("night\t🌙\tNight\texperience\nreset\t⚡\tReset\tsystem\n")
     mi:close()
-    -- fakes: rofi escolhe a linha night; hyprctl regista os evals
+    -- fakes: o launcher usa `-format i`, por isso o rofi devolve o ÍNDICE da
+    -- linha night (0-based) em vez da linha em si; guarda também as linhas
+    -- recebidas para o teste as poder inspecionar. hyprctl regista os evals.
     local fk = assert(io.open(sand .. "/fakebin/rofi", "w"))
-    fk:write("#!/usr/bin/env bash\ngrep -m1 night\n"); fk:close()
+    fk:write(("#!/usr/bin/env bash\ntee '%s/rofi.rows' | awk 'tolower($0) ~ /night/{print NR-1; exit}'\n")
+             :format(sand)); fk:close()
     fk = assert(io.open(sand .. "/fakebin/hyprctl", "w"))
     fk:write(("#!/usr/bin/env bash\necho \"$@\" >> '%s/hyprctl.log'\necho ok\n")
              :format(sand)); fk:close()
@@ -308,12 +311,20 @@ function T.test_launcher_smoke()
     fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
     os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
 
-    local rc = os.execute(("PATH='%s/fakebin':$PATH bash '%s/ui/launcher.sh'")
+    -- LC_ALL=C fixa o locale: sem isto o launcher traduz os nomes dos perfis
+    -- (pt: "Night" → "Noite") e o fake acima, que escolhe a linha por nome,
+    -- deixava de a encontrar na máquina de quem corre os testes em pt/zh.
+    local rc = os.execute(("PATH='%s/fakebin':$PATH LC_ALL=C bash '%s/ui/launcher.sh'")
                           :format(sand, sand))
     assert(rc, "launcher saiu com erro")
     local log = assert(io.open(sand .. "/hyprctl.log")):read("*a")
     assert(log:match("eval hv%.apply%('night'%)"),
            "launcher devia invocar hv.apply('night'); log:\n" .. log)
+    -- o id resolve-se por índice, por isso não deve aparecer no ecrã: nada
+    -- de "[night]" a ocupar uma coluna em todas as linhas
+    local rows = assert(io.open(sand .. "/rofi.rows")):read("*a")
+    assert(not rows:match("%[night%]"),
+           "as linhas não deviam expor o id ao utilizador; linhas:\n" .. rows)
 end
 
 function T.test_installer_modo_automatico()
@@ -328,9 +339,10 @@ function T.test_installer_modo_automatico()
 
     -- modo 2 (automático): dia = perfil 7 (focus) às 8h, noite = perfil 8 (night) às 21h
     local run = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 " ..
-                 "HOME='%s/home' bash '%s/install.sh' >'%s/out.log' 2>&1")
+                 "HOME='%s/home' XDG_STATE_HOME='%s/home/.local/state' " ..
+                 "bash '%s/install.sh' >'%s/out.log' 2>&1")
     assert(os.execute(("printf '2\\n7\\n8\\n8\\n21\\n' | " ..
-                        run):format(sand, sand, ROOT, sand)),
+                        run):format(sand, sand, sand, ROOT, sand)),
            "install.sh (modo automático) saiu com erro")
 
     local cfg_path = sand .. "/home/.config/hypr/hyprvision/config.lua"
@@ -343,7 +355,7 @@ function T.test_installer_modo_automatico()
 
     -- reinstalação: não deve voltar a perguntar nem tocar num config.lua já personalizado
     os.execute(("sed -i 's/menu  = \"SUPER + H\"/menu  = \"SUPER + M\"/' '%s'"):format(cfg_path))
-    assert(os.execute((run .. " </dev/null"):format(sand, sand, ROOT, sand)),
+    assert(os.execute((run .. " </dev/null"):format(sand, sand, sand, ROOT, sand)),
            "reinstalação saiu com erro")
     local cfg2 = assert(io.open(cfg_path)):read("*a")
     assert(cfg2:match('menu  = "SUPER %+ M"'),
@@ -362,8 +374,9 @@ function T.test_installer_modo_manual_e_eof()
 
     -- stdin fechado: nunca deve travar, tem de cair no modo manual por omissão
     local run = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=zh_CN.UTF-8 " ..
-                 "HOME='%s/home' bash '%s/install.sh' </dev/null >'%s/out.log' 2>&1")
-    assert(os.execute(run:format(sand, sand, ROOT, sand)),
+                 "HOME='%s/home' XDG_STATE_HOME='%s/home/.local/state' " ..
+                 "bash '%s/install.sh' </dev/null >'%s/out.log' 2>&1")
+    assert(os.execute(run:format(sand, sand, sand, ROOT, sand)),
            "install.sh com stdin fechado devia terminar sem erro")
 
     local cfg = assert(io.open(sand .. "/home/.config/hypr/hyprvision/config.lua")):read("*a")
@@ -381,8 +394,12 @@ function T.test_uninstall_limpa_o_hyprland_lua()
     end
     os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
 
-    local env = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 HOME='%s/home'")
-                :format(sand, sand)
+    -- XDG_STATE_HOME tem de ser sandboxado a par do HOME: o uninstall apaga a
+    -- ponte tonal em ~/.local/state/hyprvision e, com a variável a apontar
+    -- para o ambiente real, um `rm -rf` do teste atingia dados do utilizador.
+    local env = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 " ..
+                 "HOME='%s/home' XDG_STATE_HOME='%s/home/.local/state'")
+                :format(sand, sand, sand)
     -- instala (modo manual, sem conflitos de atalho) e confirma que o require lá está
     assert(os.execute(("printf '1\\n' | %s bash '%s/install.sh' >'%s/out.log' 2>&1")
                        :format(env, ROOT, sand)),
@@ -415,8 +432,12 @@ function T.test_install_prefere_user_lua_quando_existe()
     end
     os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
 
-    local env = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 HOME='%s/home'")
-                :format(sand, sand)
+    -- XDG_STATE_HOME tem de ser sandboxado a par do HOME: o uninstall apaga a
+    -- ponte tonal em ~/.local/state/hyprvision e, com a variável a apontar
+    -- para o ambiente real, um `rm -rf` do teste atingia dados do utilizador.
+    local env = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 " ..
+                 "HOME='%s/home' XDG_STATE_HOME='%s/home/.local/state'")
+                :format(sand, sand, sand)
     assert(os.execute(("printf '1\\n' | %s bash '%s/install.sh' >'%s/out.log' 2>&1")
                        :format(env, ROOT, sand)),
            "install.sh saiu com erro")

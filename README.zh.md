@@ -22,7 +22,8 @@
 - **无后台服务的自适应**：按时间和电池状态自动切换配置（并在恢复后自动还原之前的配置），通过 Hyprland 原生的 `hl.timer` 实现
 - **真正的持久化**：配置在 `hyprctl reload` 后依然保留 —— Lua 运行时会重建，`init.lua` 会在加载时恢复状态
 - **社区提供的额外着色器**：`shaders/extras/` 文件夹已接入菜单
-- **菜单支持 3 种语言**（英语、葡萄牙语、中文，根据系统语言自动选择），并会跟随当前的主题色：如果你在用 [Caelestia](https://github.com/caelestia-dots/shell)，菜单会自动跟随你壁纸生成的 Material 配色
+- **菜单支持 3 种语言**（英语、葡萄牙语、中文，根据系统语言自动选择），并会跟随当前的主题色：如果你在用 [Noctalia](https://github.com/noctalia-dev/noctalia-shell) 或 [Caelestia](https://github.com/caelestia-dots/shell)，*整个*菜单（背景、层级、文字、容器，而不只是强调色）都会跟随你壁纸生成的 Material 配色
+- **真正的玻璃效果，而非扁平面板**：在合成器的模糊之上呈现半透明，结构与 [Hypr.AI](https://github.com/mastermaiolo/hyprai) 共享 —— 4px 网格、同心圆角、经过验证的 OKLCH 配色（≥4.5:1）、仅顶部边缘的玻璃高光。安装程序会询问是否添加 Hyprland 对 layer-shell 弹窗应用模糊所需的 `layerrule`
 - **可恢复的紧急重置**（`Super+Shift+H`）：把屏幕恢复到中性状态，并把当前状态存档到 `state.bak` —— 菜单里会出现"恢复上一个状态"
 - **平滑过渡**：色温/亮度/伽马的变化通过 wl-gammarelay-rs 实现平滑过渡（按需启动）
 
@@ -124,6 +125,8 @@ core.lua        核心引擎：状态、配置、GLSL 合成、应用、伽马�
 config.lua      用户配置（快捷键、日程、电池）
 profiles/*.lua  声明式的配置文件
 ui/launcher.sh  Rofi 菜单（读取 state/，通过 hyprctl eval 发送 "hv.*"）
+rofi/*.rasi     菜单主题：4px 网格、同心圆角、玻璃效果
+theme/*.tmpl    色调桥接模板，壁纸变更时由 Noctalia 重新渲染
 ```
 
 `hyprctl eval` 不会返回任何输出，所以 Lua 端把 `state/state` 和 `state/profiles.menu` 作为供菜单读取的接口。合成后的着色器会生成在 `$XDG_RUNTIME_DIR/hyprvision/` 里。所有在合成器里运行的代码都包在 `pcall` 里 —— 一个出错的配置只会记录到日志，绝不会导致某个处理函数崩溃。

@@ -1,0 +1,142 @@
+/* ══════════════════════════════════════════════════════════════════════
+   GlassTheme Rofi · Tema Principal
+   Construído sobre o coherent-design: grid de 4, raios concêntricos,
+   vidro líquido translúcido calibrado para Wayland/Hyprland.
+
+   Camadas:
+   1. Janela: O vidro em si (70% de opacidade sobre o blur do Hyprland).
+   2. Conteúdo: Inputbar, agrupamentos e linha selecionada utilizam
+      materiais sólidos/semi-sólidos MAIS CLAROS que o vidro (bg1/bg2).
+      Essa diferença de tom é o que cria profundidade física sem sujar
+      com sombras artificiais.
+   3. Realce (rim-top): Aresta de luz apenas na borda superior (1.5px).
+   ══════════════════════════════════════════════════════════════════════ */
+
+@import "palette-static.rasi"
+
+* {
+    font:               "SF Pro Text 11";
+    background-color:   transparent;
+    text-color:         @fg0;
+    margin:             0px;
+    padding:            0px;
+    spacing:            0px;
+}
+
+window {
+    location:           north;
+    /* Offset vertical calibrado para telas 1080p sob Hyprland */
+    y-offset:           71px;
+    width:              640px;
+
+    /* Apenas a borda superior renderiza para simular incidência real de luz */
+    border:             1.5px 0px 0px 0px;
+    border-color:       @rim-top;
+    border-radius:      24px;   /* r-xl — folha flutuante */
+    background-color:   @bg0;
+}
+
+mainbox {
+    padding:            16px;   /* space-4 — espaçamento padrão periférico */
+}
+
+/* Raios concêntricos: 24px (janela) - 16px (padding) = 8px para filhos diretos */
+inputbar {
+    background-color:   @bg1;
+    border:             0.5px 0px 0px 0px;
+    border-color:       @rim-top;
+    border-radius:      8px;
+    padding:            10px 14px;
+    spacing:            10px;
+    children:           [ prompt, entry ];
+}
+
+/* Emblema / Badge à esquerda do campo de entrada */
+prompt {
+    background-color:   @chip-bg;
+    text-color:         @bg3;
+    font:               "SF Pro Text Semibold 12";
+    border-radius:      999px;   /* Formato de pílula / cápsula */
+    padding:            6px 14px;
+}
+
+entry {
+    placeholder:        "Buscar...";
+    placeholder-color:  @fg2;
+    text-color:         @fg0;
+    font:               "SF Pro Text 13";
+    padding:            6px 4px;
+}
+
+/* Fileira de categorias ou mensagens informativas (acima da lista) */
+message {
+    margin:             12px 0 0;   /* space-3 */
+    border-radius:      8px;
+    background-color:   @bg2;
+}
+
+textbox {
+    padding:            10px 14px;
+    text-color:         @fg2;
+    font:               "SF Pro Text 10";
+}
+
+listview {
+    background-color:   transparent;
+    margin:             12px 0 0;   /* space-3 */
+    lines:              10;
+    columns:            1;
+    fixed-height:       false;
+    spacing:            2px;        /* space-0 — itens coesos, o grupo respira externamente */
+}
+
+element {
+    padding:            12px 12px;  /* space-3 */
+    spacing:            10px;
+    border-radius:      8px;        /* Concêntrico */
+}
+
+element.normal.normal,
+element.alternate.normal {
+    background-color:   transparent;
+}
+
+/* Seleção sutil tingida com accent a 12%, preservando a cor legível do texto */
+element.selected.normal,
+element.selected.active {
+    background-color:   @sel;
+    text-color:         @fg0;
+}
+
+element.normal.active,
+element.alternate.active {
+    text-color:         @bg3;
+}
+
+element-icon {
+    size:               1.5em;
+    vertical-align:     0.5;
+}
+
+element-text {
+    text-color:         inherit;
+    highlight:          bold;
+    vertical-align:     0.5;
+}
+
+/* Barra de rolagem em formato pílula ultra-fina */
+scrollbar {
+    background-color:   @bg2;
+    handle-color:       @bg3;
+    border-radius:      999px;
+    width:              4px;
+}
+
+/* Painel de erros */
+error-message {
+    background-color:   @bg0;
+    border:             2px solid;
+    border-color:       @error;
+    border-radius:      16px;   /* r-lg */
+    padding:            20px;   /* space-5 */
+}

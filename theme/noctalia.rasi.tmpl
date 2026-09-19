@@ -1,0 +1,34 @@
+/* ══════════════════════════════════════════════════════════════════════
+   HyprVision · Ponte de cor tonal com o Noctalia
+   Gerado automaticamente pelo Noctalia Template Processor sempre que o
+   wallpaper/scheme muda — NÃO editar o ficheiro de saída à mão.
+
+   Mapeia os papéis Material You (M3) para os tokens do coherent-design
+   usados em rofi/hyprvision.rasi — TODOS os neutros seguem o wallpaper,
+   não só o accent. `surface_container_high` (mais claro que `background`)
+   vira `bg1`, a camada de conteúdo elevada sobre o vidro; é essa diferença
+   de tom, não sombra, que dá profundidade ao vidro.
+
+   Os alphas (B3 = 70%, E6 = 90%, 99 = 60%) são o que faz o vidro
+   aparecer: acima de ~85% no fundo, o blur do compositor deixa de
+   contribuir e o painel lê como tinta chapada. Ver DESIGN.md.
+
+   Mesmo ficheiro, mesmos tokens e mesmos alphas que o Hypr.AI usa — as
+   duas ferramentas partilham o sistema visual de propósito.
+   ══════════════════════════════════════════════════════════════════════ */
+* {
+    bg0:        {{colors.background.default.hex}}B3;
+    bg1:        {{colors.surface_container_high.default.hex}}E6;
+    bg2:        {{colors.surface_container.default.hex}}99;
+    bg3:        {{colors.primary.default.hex}}F2;
+    fg0:        {{colors.on_background.default.hex}};
+    fg2:        {{colors.on_surface_variant.default.hex}};
+    fg3:        {{colors.outline.default.hex}};
+    accent-fg:  {{colors.on_primary.default.hex}};
+    error:      {{colors.error.default.hex}}F2;
+    sel:        {{colors.primary.default.hex}}1F;
+    sep:        {{colors.outline.default.hex}};
+    chip-bg:    {{colors.primary_container.default.hex}};
+    chip-fg:    {{colors.on_primary_container.default.hex}};
+    rim-top:    {{colors.on_background.default.hex}}38;
+}

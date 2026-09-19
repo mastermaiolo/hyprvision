@@ -26,7 +26,17 @@ if [[ -f "$WIREFILE" && "$WIREFILE" != "$HYPRLUA" ]]; then
     echo "✓ require removido do user.lua"
 fi
 
+# ponte de cor tonal: retira o bloco que o install.sh acrescentou
+NOCTALIA_CONF="$HOME/.config/noctalia/config.toml"
+if [[ -f "$NOCTALIA_CONF" ]] && grep -q "theme.templates.user.hyprvision" "$NOCTALIA_CONF"; then
+    sed -i '/\[theme\.templates\.user\.hyprvision\]/,/^\s*output_path = .*noctalia-colors\.rasi"$/d' "$NOCTALIA_CONF"
+    echo "✓ ponte de cor tonal removida do Noctalia"
+fi
+# A layerrule "rofi-glass" em windowrules.lua fica: o namespace é partilhado
+# com o Hypr.AI e removê-la aqui tiraria o vidro do outro launcher também.
+
 rm -rf "$DEST"
 rm -rf "${XDG_RUNTIME_DIR:-/tmp}/hyprvision"
+rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/hyprvision"
 echo "✓ $DEST removido"
 echo "── Feito. \`hyprctl reload\` para largar os binds desta sessão. ──"

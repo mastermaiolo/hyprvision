@@ -22,7 +22,8 @@
 - **Adaptativo sem daemon**: perfil por horário e por estado da bateria (com recuperação automática do perfil anterior) via `hl.timer` nativo
 - **Persistência real**: os perfis sobrevivem a `hyprctl reload` — o runtime Lua é recriado e o `init.lua` restaura o estado ao carregar
 - **Shaders extra da comunidade**: pasta `shaders/extras/` integrada no menu
-- **Menu Rofi em 3 idiomas** (inglês, português, 中文, pelo locale do sistema) e com a cor tonal actual: se corres [Caelestia](https://github.com/caelestia-dots/shell), o menu segue automaticamente a paleta Material do teu wallpaper
+- **Menu Rofi em 3 idiomas** (inglês, português, 中文, pelo locale do sistema) e com a cor tonal actual: se corres [Noctalia](https://github.com/noctalia-dev/noctalia-shell) ou [Caelestia](https://github.com/caelestia-dots/shell), o menu *inteiro* — fundo, elevação, texto, containers, não só o accent — segue a paleta Material do teu wallpaper
+- **Vidro a sério, não um painel chapado**: translúcido sobre o blur do compositor, com a estrutura partilhada com o [Hypr.AI](https://github.com/mastermaiolo/hyprai) — grid de 4px, raios concêntricos, paleta OKLCH verificada (≥4.5:1) e realce de vidro só na borda de cima. O instalador oferece-se para acrescentar o `layerrule` de que o Hyprland precisa para aplicar blur a popups layer-shell
 - **Reset de emergência recuperável** (`Super+Shift+H`): repõe o ecrã neutro e arquiva o estado em `state.bak` — o menu ganha "Recuperar último estado"
 - **Transições suaves** de temperatura/brightness/gamma via wl-gammarelay-rs (arranque on-demand)
 
@@ -124,6 +125,8 @@ core.lua        motor: estado, perfis, compose GLSL, apply, gamma, ticks
 config.lua      configuração do utilizador (keybinds, horário, bateria)
 profiles/*.lua  perfis declarativos
 ui/launcher.sh  menu Rofi (lê state/, envia hyprctl eval "hv.*")
+rofi/*.rasi     tema do menu: grid de 4px, raios concêntricos, vidro
+theme/*.tmpl    ponte tonal renderizada pelo Noctalia a cada wallpaper
 ```
 
 O `hyprctl eval` não devolve output, por isso o Lua mantém `state/state` e `state/profiles.menu` como interface de leitura para o launcher. Os shaders compostos são gerados em `$XDG_RUNTIME_DIR/hyprvision/`. Tudo o que corre no compositor está embrulhado em `pcall` — um perfil roto regista no log e nunca derruba um handler.

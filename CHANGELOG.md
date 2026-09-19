@@ -1,5 +1,23 @@
 # Changelog
 
+## v5.2.0 — 2026-09-19
+
+Menu Rofi reconstruído sobre o mesmo sistema visual do Hypr.AI — as ferramentas do ecossistema passam a ler-se como um sistema só, não como widgets independentes. Nenhuma mudança de comportamento nos perfis, shaders ou overlays.
+
+### Adicionado
+- **Ponte de cor tonal com o Noctalia**, a par do Caelestia que já existia: `theme/noctalia.rasi.tmpl` é registado pelo instalador como *user template* e o próprio Noctalia regenera as cores a cada troca de wallpaper/scheme. E agora **todos** os neutros seguem o esquema (fundo, elevação, texto, separadores, containers), não apenas o accent — com o accent dinâmico e o resto fixo, o menu lia como chrome alheio ao resto do desktop.
+- **Exceção de vidro para o namespace `rofi`**: o instalador pergunta (sim explícito, nunca por omissão) se pode acrescentar um `layer_rule` com `blur`/`xray`/`ignore_alpha` ao `windowrules.lua`. No Hyprland, um popup layer-shell **não recebe blur** sem uma regra explícita — sem ela, o tema de vidro renderiza como painel quase opaco. A regra é partilhada com o Hypr.AI (mesmo namespace), por isso não é duplicada se já existir.
+- **Fileira de categorias** acima da lista (`Correção · Experiência · Sistema · Overlays`) como legenda visual dos grupos.
+
+### Alterado
+- **O vidro ficou vidro**: o fundo do painel desceu de 95% para **70%** de opacidade (elevação a 90%). Acima de ~85%, o blur do compositor deixa de contribuir — o que está atrás vira uma mancha uniforme e sobra pouca luz para essa mancha aparecer, pelo que o painel lia como tinta chapada. Um screenshot engana aqui (o `grim` captura antes do blur, e os poucos % de transparência ainda mostram wallpaper nítido); só o ecrã real diz a verdade.
+- **Os ids deixaram de aparecer no menu**: o launcher passa a usar `-format i` e mapeia índice → id em arrays paralelos, em vez de embutir `[reset]` em cada linha e extraí-lo de volta com `pick_id`. A coluna de ids cinzentos desapareceu do ecrã.
+- **Cabeçalhos de secção discretos** — texto pequeno em capitalização normal, sem os traços `──  CORREÇÃO  ──`. O elemento menos importante do ecrã não leva o tratamento mais pesado; maiúsculas destroem a forma da palavra, que é o que torna uma lista rápida de percorrer.
+- **Selecção tingida** (accent a 12%) em vez de barra de accent sólida à largura toda — que, com um accent claro, ainda obrigava a inverter o texto para escuro. O accent fica reservado a áreas pequenas: badge, chips e scrollbar.
+- **Estrutura e dimensões** alinhadas com o coherent-design e com o Hypr.AI: grid de 4px, raios concêntricos (janela 24 → padding 16 → filhos 8), realce de vidro só na borda de cima, linhas mais altas (padding 12px) e ícones a 1.5em, tipografia do sistema (proporcional, não monoespaçada), paleta OKLCH com contraste verificado (`--hue 268 --accent 251`, ≥4.5:1 em todos os pares).
+- **Estado do ecrã como badge** à esquerda da busca (pílula compacta), no papel do ícone de lupa do Spotlight.
+- `test_launcher_smoke` acompanha o novo contrato (`-format i`), fixa `LC_ALL=C` — dependia acidentalmente do locale, porque escolhia a linha pelo id visível — e passa a verificar que os ids **não** chegam ao ecrã.
+
 ## v5.1.2 — 2026-09-05
 
 ### Corrigido
