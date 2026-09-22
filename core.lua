@@ -11,6 +11,11 @@ M.DEFAULTS = {
 local STATE_KEYS = { "profile", "shader", "icc", "extra", "paper", "dim",
                      "temperature", "brightness", "gamma" }
 
+-- Último ICC efectivamente aplicado — set_icc() só reafirma o monitor
+-- inteiro (mode/position/scale/transform/vrr/…) quando o ICC muda de
+-- facto; sem isto, todo overlay (dim/paper) redeclarava o monitor à toa.
+local _last_icc
+
 function M.setup(opts)
     M.hl        = assert(opts.hl, "setup: falta hl")
     M.base      = assert(opts.base, "setup: falta base")
@@ -18,6 +23,7 @@ function M.setup(opts)
     M.runtime   = opts.runtime
                   or ((os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprvision")
     os.execute("mkdir -p '" .. M.state_dir .. "' '" .. M.runtime .. "'")
+    _last_icc = nil
 end
 
 function M.state_file_path() return M.state_dir .. "/state" end
@@ -328,6 +334,9 @@ local function set_shader(path)
 end
 
 local function set_icc(icc_path)
+    icc_path = icc_path or ""
+    if icc_path == _last_icc then return end
+    _last_icc = icc_path
     for _, m in ipairs(M.hl.get_monitors() or {}) do
         if m.name then
             local spec = {
