@@ -137,7 +137,7 @@ The shaders in `shaders/extras/` come from the Hyprland community — kept as re
 
 | Author | Project | Shaders |
 |---|---|---|
-| **[snes19xx](https://github.com/snes19xx)** | [surface-dots](https://github.com/snes19xx/surface-dots) | cinema, clarity_inefficient, crt_mode, focus, fuji_acros, gameboy, IBM5151, main, matte, night, night_vision, outdoor, reading_mode, soft, vhs |
+| **[snes19xx](https://github.com/snes19xx)** | [surface-dots](https://github.com/snes19xx/surface-dots) | amano, art_canvas, cinema, clarity_inefficient, crt_mode, dither, focus, fuji_acros, gameboy, greens, IBM5151, main, matte, night, night_vision, outdoor, reading_mode, silent_hill, smart_invert, soft, vhs |
 | **0x15BA88FF** | [hyprshaders](https://github.com/0x15BA88FF/hyprshaders) | chromatic_abberation, colors, contrast, crt, drugs, extradark, grain, invert, retro, solarized |
 | **Sijan-Bhusal** | [HyprShades](https://github.com/sijan-dev/HyprShades) | amoled, blue-light-filter, cyberpunk, matrix, retro |
 | **ManofJELLO** | [HyprWindowShade](https://github.com/ManofJELLO/HyprWindowShade) | chromaGlitch, pixelate, wireframe |
