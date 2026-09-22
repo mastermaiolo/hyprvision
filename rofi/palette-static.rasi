@@ -27,7 +27,7 @@
     sel:        #A18DEE1F;
     sep:        @fg3;
     chip-bg:    #A18DEE24;   /* Container tonal (14%) para badges */
-    chip-fg:    @fg2;
+    chip-fg:    @bg3;        /* Texto do badge do prompt sobre chip-bg — accent sólido no fallback estático, como o Hypr.AI */
 
     /* Realce de vidro: luz captada na aresta superior */
     rim-top:    #F5F5F838;

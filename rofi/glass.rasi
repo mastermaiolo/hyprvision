@@ -51,10 +51,15 @@ inputbar {
     children:           [ prompt, entry ];
 }
 
-/* Emblema / Badge à esquerda do campo de entrada */
+/* Emblema / Badge à esquerda do campo de entrada — text-color usa @chip-fg
+   (papel M3 on_primary_container), não @bg3 (primary bruto): é o papel que
+   a ponte tonal já calcula com contraste verificado especificamente para
+   ficar legível sobre @chip-bg (primary_container). Usar @bg3 direto
+   ignorava esse cálculo e prendia o texto ao accent bruto mesmo com
+   Noctalia/Caelestia activos. */
 prompt {
     background-color:   @chip-bg;
-    text-color:         @bg3;
+    text-color:         @chip-fg;
     font:               "SF Pro Text Semibold 12";
     border-radius:      999px;   /* Formato de pílula / cápsula */
     padding:            6px 14px;
