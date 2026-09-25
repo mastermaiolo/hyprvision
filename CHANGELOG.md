@@ -1,5 +1,23 @@
 # Changelog
 
+## Por lançar
+
+Port das correções feitas no Hypr.AI (v1.1.0) para a camada que os dois partilham — launcher Rofi, tema tonal e instalador.
+
+### Corrigido
+- **O instalador e o desinstalador apagavam linhas do utilizador no `hyprland.lua`**: a limpeza era `sed '/hyprvision/d'` + `'/require("init")/d'`, que levava também qualquer comentário com a palavra e qualquer `require("init")` que não fosse do HyprVision (um módulo `init` próprio deixava de carregar). Agora sai só o bloco entre `-- HyprVision >>>`/`<<<` e, de instalações v5.0/v5.1, exatamente as três linhas consecutivas que elas escreviam.
+- **Symlinks de dotfiles**: `hyprland.lua`, `user.lua`, `config.lua` e o `config.toml` do Noctalia eram substituídos por cópias soltas (`sed -i`/`mv`); passam a ser reescritos por cima e continuam symlinks.
+- **Modo claro**: a guarda de brilho absoluto rejeitava todo esquema claro (no M3 claro o `primary` é escuro por desenho) e o menu caía no violeta estático. Passa a exigir contraste ≥ 3:1 (WCAG 1.4.11) entre o accent e o fundo do próprio esquema.
+- **Tecla ocupada**: a tecla nova não era verificada, e sem terminal ficava a tecla ocupada — a combinação passava a disparar duas acções. Agora pergunta até haver uma livre; sem terminal, deixa a tecla vazia (`""`) e o `init.lua` não cria esse bind.
+- **Editar configuração**: um `$VISUAL` gráfico fora da lista abria dentro de um terminal, e o `-e` usado para todos os terminais não existe no kitty nem no foot (cada um recebe agora a sua sintaxe). Sem `notify-send`, o `set -e` terminava o launcher a meio.
+- **Reinstalar apagava o `rofi/user.rasi`** (o `rsync --delete` não o excluía).
+
+### Alterado
+- **Vidro a 60%** (era 70%), **fonte Inter** (era SF Pro Text) e **janela centrada** por omissão — iguais ao Hypr.AI. Uma posição afinada à mão vai para `rofi/user.rasi`, aplicado por último.
+- **Cabeçalhos de secção** passam como `nonselectable`: o Enter num cabeçalho já não reabre o menu (as setas continuam a parar neles — limitação do dmenu do rofi).
+- **`uninstall.sh` em en/pt/zh**, com o mesmo critério de locale do launcher.
+- `shellcheck` sem avisos nos três scripts; 4 testes novos (linhas do utilizador preservadas, symlink, `user.rasi` na reinstalação, tecla ocupada sem terminal → sem bind).
+
 ## v5.2.0 — 2026-09-19
 
 Menu Rofi reconstruído sobre o mesmo sistema visual do Hypr.AI — as ferramentas do ecossistema passam a ler-se como um sistema só, não como widgets independentes. Nenhuma mudança de comportamento nos perfis, shaders ou overlays.

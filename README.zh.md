@@ -60,7 +60,7 @@ git clone https://github.com/mastermaiolo/hyprvision && cd hyprvision
 
 安装程序是交互式的（根据系统语言显示英文或中文），在全新安装时还会：
 - 检查 rofi、wl-gammarelay-rs 和 libnotify，并提供安装缺失依赖的选项（通过 pacman/apt/dnf；wl-gammarelay-rs 只在 AUR 中提供，会用 paru/yay 安装）；
-- 如果 `Super+H` 或 `Super+Shift+H` 已经被占用，可以让你选择别的按键；
+- 如果 `Super+H` 或 `Super+Shift+H` 已经被占用，可以让你选择别的按键（新键同样会检查）；没有终端可询问时，宁可不创建该快捷键也不重复绑定，并告诉你在哪里设置；
 - 询问你想手动切换配置，还是按时间自动切换（一个白天配置，一个夜晚配置）。
 
 完成之后，会把文件复制到 `~/.config/hypr/hyprvision`，在 `hyprland.lua` 里加入 `require("init")`（如果 `~/.config/hypr/user.lua` 已存在，则改为加到这个文件里，这样在模块化配置系统（例如 Ryoku）自身更新时 require 也不会丢失），并重新加载 Hyprland —— 马上就能用。再次运行会更新文件，但不会重新询问，也不会丢失 `config.lua` 或状态。
@@ -91,6 +91,14 @@ hyprctl eval "hv.restore_backup()"         恢复存档的状态
 - `battery.restore_after_low` —— 电池电量恢复后，会自动切回电量不足前正在使用的配置
 - `schedule.apply_on_start` —— 默认是 `false`：开机时保留你上次的配置；日程只在时间跨过某个时间点时才会触发
 - 时间段除了 `hour` 之外还支持 `minute`
+- 把某个键设为 `""`（空）表示该操作没有快捷键
+
+菜单默认居中。要移动它或调整主题（宽度、字体……），创建 `~/.config/hypr/hyprvision/rofi/user.rasi` —— 最后应用，安装程序永远不会碰它：
+
+```css
+/* ~/.config/hypr/hyprvision/rofi/user.rasi */
+window { location: north; y-offset: 120px; }
+```
 
 ## 创建自己的配置
 

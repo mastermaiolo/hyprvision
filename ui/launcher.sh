@@ -19,6 +19,7 @@ elif [[ -f "$BASE_DIR/rofi/hyprvision.rasi" ]]; then
 else
     ROFI_THEME="glass"
 fi
+USER_RASI="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprvision/rofi/user.rasi"
 
 sv() {   # valor de uma chave do estado (default $2)
     local v=""
@@ -59,6 +60,7 @@ declare -A T=(
     [en:config_saved]="After saving: hyprctl reload" [pt:config_saved]="Após guardar: hyprctl reload" [zh:config_saved]="保存后执行: hyprctl reload"
     [en:search_placeholder]="search profile..."      [pt:search_placeholder]="pesquisar perfil..."   [zh:search_placeholder]="搜索配置..."
 )
+# shellcheck disable=SC2059  # o formato É a tradução (leva %s)
 t() { printf -- "${T[$L:$1]}" "${2:-}"; }
 
 # ── nomes dos perfis traduzidos (inglês usa o nome tal como vem do profiles.menu) ─
@@ -97,22 +99,33 @@ scheme_color() {   # $1=campo do scheme.json → hex de 6 dígitos, ou nada
     sed -n "s/.*\"$1\": *\"\([0-9a-fA-F]\{6\}\)\".*/\1/p" "$SCHEME_JSON" | head -1
 }
 
-# Guarda de legibilidade: aceita um hex só se não for escuro a mais para
-# servir de accent em qualquer contexto (chip, prompt, scrollbar). Brilho
-# percebido em aritmética inteira — aproximação grosseira, mas chega para
-# rejeitar os casos maus sem puxar python só por causa disto.
-_bright_enough() {
-    local hex="$1" r g b
-    r=$((16#${hex:0:2})); g=$((16#${hex:2:2})); b=$((16#${hex:4:2}))
-    (( (r * 299 + g * 587 + b * 114) / 1000 >= 120 ))
+# Guarda de legibilidade: aceita o accent só se contrastar ≥ 3:1 com o fundo
+# (WCAG 1.4.11, componentes não-texto — prompt, scrollbar). Contraste e não
+# brilho absoluto: num esquema claro o primary do M3 é escuro de propósito,
+# e uma guarda de brilho rejeitava todo wallpaper claro (o menu caía no
+# violeta estático). awk só pela vírgula flutuante da curva sRGB.
+_contrast_ok() {   # $1=accent $2=fundo, hex sem '#'
+    awk -v a="$1" -v b="$2" '
+        function ch(h,   v) { h = tolower(h)   # gawk não lê "0x.." de string
+                              v = (index("0123456789abcdef", substr(h, 1, 1)) - 1) * 16 \
+                                +  index("0123456789abcdef", substr(h, 2, 1)) - 1
+                              v /= 255
+                              return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ^ 2.4 }
+        function lum(h) { return 0.2126 * ch(substr(h, 1, 2)) + 0.7152 * ch(substr(h, 3, 2)) \
+                               + 0.0722 * ch(substr(h, 5, 2)) }
+        BEGIN { la = lum(a); lb = lum(b)
+                r = la > lb ? (la + 0.05) / (lb + 0.05) : (lb + 0.05) / (la + 0.05)
+                exit !(r >= 3) }'
 }
 
 dynamic_theme() {
     # 1) Noctalia — já renderizou theme/noctalia.rasi.tmpl inteiro (todos os
     # tokens, não só o accent); basta repassar o ficheiro.
     if [[ -s "$NOCTALIA_THEME" ]] && ! grep -q '{{' "$NOCTALIA_THEME"; then
-        local accent; accent="$(sed -n 's/.*bg3:[[:space:]]*#\([0-9a-fA-F]\{6\}\).*/\1/p' "$NOCTALIA_THEME" | head -1)"
-        if [[ -n "$accent" ]] && _bright_enough "$accent"; then
+        local accent bg
+        accent="$(sed -n 's/.*bg3:[[:space:]]*#\([0-9a-fA-F]\{6\}\).*/\1/p' "$NOCTALIA_THEME" | head -1)"
+        bg="$(sed -n 's/.*bg0:[[:space:]]*#\([0-9a-fA-F]\{6\}\).*/\1/p' "$NOCTALIA_THEME" | head -1)"
+        if [[ -n "$accent" && -n "$bg" ]] && _contrast_ok "$accent" "$bg"; then
             cat "$NOCTALIA_THEME"
             return 0
         fi
@@ -122,7 +135,9 @@ dynamic_theme() {
     # de tokens à mão a partir dos papéis M3 que o scheme expõe.
     local primary; primary="$(scheme_color primary)"
     [[ -n "$primary" ]] || return 0
-    _bright_enough "$primary" || return 0
+    # Sem background não há contra o que medir — mede contra o fundo estático.
+    local bg_c; bg_c="$(scheme_color background)"
+    _contrast_ok "$primary" "${bg_c:-0D0D10}" || return 0
 
     local background surf_hi surf on_bg on_surf_var outline on_primary prim_cont on_prim_cont error
     background="$(scheme_color background)"
@@ -137,12 +152,12 @@ dynamic_theme() {
     error="$(scheme_color error)"
 
     if [[ -n "$background" && -n "$on_bg" ]]; then
-        # Os alphas (B3/E6/99) são o que faz o vidro aparecer — ver o
+        # Os alphas (99/E6/99) são o que faz o vidro aparecer — ver o
         # comentário no .rasi: acima de ~85% o blur do compositor deixa de
         # contribuir e o painel lê como tinta chapada.
         cat <<RASI
 * {
-    bg0:        #${background}B3;
+    bg0:        #${background}99;
     bg1:        #${surf_hi:-$background}E6;
     bg2:        #${surf:-$background}99;
     bg3:        #${primary}F2;
@@ -162,6 +177,62 @@ RASI
         # Sem papéis suficientes para os neutros — só o accent, como compat
         # mínimo (a estrutura/grid do tema não muda).
         printf '* { bg3: #%sF2; sel: #%s1F; chip-bg: #%s24; }\n' "$primary" "$primary" "$primary"
+    fi
+}
+
+# notify-send é opcional (libnotify) — sem ele a mensagem perde-se, mas com
+# set -e um "command not found" terminava o launcher a meio.
+notify() {
+    command -v notify-send &>/dev/null || return 0
+    notify-send -a HyprVision "$@" || true
+}
+
+# Abre $@ num terminal com o título $1. Cada terminal tem a sua sintaxe: o
+# "-e" que servia a todos não existe no kitty nem no foot, que recebem o
+# comando direto. Vazio se não houver nenhum.
+term_argv() {
+    local title="$1" t bin=""; shift
+    for t in foot kitty alacritty wezterm ghostty konsole xterm; do
+        bin="$(command -v "$t" 2>/dev/null)" && break
+    done
+    TERM_ARGV=()
+    [[ -n "$bin" ]] || return 1
+    case "${bin##*/}" in
+        kitty)     TERM_ARGV=("$bin" --title "$title" "$@") ;;
+        foot)      TERM_ARGV=("$bin" "--title=$title" "$@") ;;
+        ghostty)   TERM_ARGV=("$bin" "--title=$title" -e "$@") ;;
+        alacritty) TERM_ARGV=("$bin" --title "$title" -e "$@") ;;
+        wezterm)   TERM_ARGV=("$bin" start --always-new-process -- "$@") ;;
+        *)         TERM_ARGV=("$bin" -e "$@") ;;
+    esac
+}
+
+# Editores de terminal conhecidos abrem num terminal; qualquer outro é
+# tratado como gráfico — ao contrário de uma lista de GUIs, em que um
+# $VISUAL gráfico fora da lista (subl, gnome-text-editor…) abria um
+# terminal vazio a correr uma janela. EDITOR="code --wait" funciona (vira
+# palavras); um editor num caminho com espaços não, como em qualquer $EDITOR.
+edit_config() {
+    local target="$1" ed bin
+    local -a cmd=()
+    for ed in "${VISUAL:-}" "${EDITOR:-}" code gedit kate gnome-text-editor nano; do
+        [[ -n "$ed" ]] || continue
+        read -ra cmd <<< "$ed"
+        bin="$(command -v -- "${cmd[0]}" 2>/dev/null)" || continue
+        cmd[0]="$bin"
+        case "${bin##*/}" in
+            nvim|vim|vi|nano|micro|hx|helix|kak|emacs|ne|joe|mcedit)
+                term_argv "${target##*/}" "${cmd[@]}" "$target" || continue
+                "${TERM_ARGV[@]}" &>/dev/null & disown
+                return ;;
+        esac
+        "${cmd[@]}" "$target" &>/dev/null & disown
+        return
+    done
+    if command -v xdg-open &>/dev/null; then
+        xdg-open "$target" &>/dev/null & disown
+    else
+        notify "$(t config_title)" "$(t config_manual "$target")"
     fi
 }
 
@@ -236,9 +307,21 @@ chips_row() {
 run_menu() {
     local dyn=(); [[ -n "$DYNAMIC_THEME_STR" ]] && dyn=(-theme-str "$DYNAMIC_THEME_STR")
     local mesg=(); [[ -n "${3:-}" ]] && mesg=(-mesg "$3")
-    printf '%s\n' "${ROW_TEXT[@]}" | rofi -dmenu -p "$1" -theme "$ROFI_THEME" \
+    # Ajustes pessoais (posição, largura, fonte) — depois do tema dinâmico,
+    # para ganharem sempre. O install.sh nunca apaga este ficheiro.
+    local usr=(); [[ -s "$USER_RASI" ]] && usr=(-theme-str "$(cat "$USER_RASI")")
+    # Linha sem id é cabeçalho: nonselectable — o rofi continua a parar nela
+    # nas setas (a opção só impede o Enter), mas o Enter já não reabre o menu.
+    local i
+    for i in "${!ROW_TEXT[@]}"; do
+        if [[ -z "${ROW_ID[i]:-}" ]]; then
+            printf '%s\x00nonselectable\x1ftrue\n' "${ROW_TEXT[i]}"
+        else
+            printf '%s\n' "${ROW_TEXT[i]}"
+        fi
+    done | rofi -dmenu -p "$1" -theme "$ROFI_THEME" \
         -theme-str "entry { placeholder: \"$(t search_placeholder)\"; }" \
-        "${dyn[@]}" "${mesg[@]}" -no-custom -markup-rows -format i -selected-row "${2:-1}"
+        "${dyn[@]}" "${usr[@]}" "${mesg[@]}" -no-custom -markup-rows -format i -selected-row "${2:-1}"
 }
 
 # Mostra o menu e devolve o id escolhido (vazio = cancelou ou cabeçalho).
@@ -330,31 +413,8 @@ case "$ID" in
         ;;
     __config__)
         CONFIG="$BASE_DIR/config.lua"
-        EDITOR_CMD=""
-        for ed in "${VISUAL:-}" "${EDITOR:-}" code gedit kate nano; do
-            if [[ -n "$ed" ]] && command -v "${ed%% *}" &>/dev/null; then
-                EDITOR_CMD="$ed"; break
-            fi
-        done
-        if [[ -z "$EDITOR_CMD" ]]; then
-            xdg-open "$CONFIG" 2>/dev/null || \
-                notify-send -a HyprVision "$(t config_title)" "$(t config_manual "$CONFIG")"
-        else
-            case "${EDITOR_CMD%% *}" in
-                code|gedit|kate) $EDITOR_CMD "$CONFIG" & disown ;;
-                *)
-                    TERM_CMD=""
-                    for term in foot kitty alacritty wezterm ghostty konsole xterm; do
-                        command -v "$term" &>/dev/null && { TERM_CMD="$term"; break; }
-                    done
-                    if [[ -n "$TERM_CMD" ]]; then
-                        $TERM_CMD -e $EDITOR_CMD "$CONFIG" & disown
-                    else
-                        xdg-open "$CONFIG" 2>/dev/null || true
-                    fi ;;
-            esac
-        fi
-        notify-send -a HyprVision "$(t config_title)" "$(t config_saved)"
+        edit_config "$CONFIG"
+        notify "$(t config_title)" "$(t config_saved)"
         ;;
     *)
         hv "apply('$ID')"

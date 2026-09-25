@@ -7,10 +7,11 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 * {
-    /* 70% opacidade (#B3) no fundo: o limite físico do efeito de vidro.
-       Acima de ~85%, o blur do compositor vira uma mancha uniforme e perde
-       a sensação de vidro translúcido. */
-    bg0:        #0D0D10B3;   /* Fundo da janela (vidro funcional, 70%) */
+    /* 60% opacidade (#99) no fundo. Acima de ~85%, o blur do compositor
+       vira uma mancha uniforme e perde a sensação de vidro translúcido; a
+       70% o painel escurecia demais o que está atrás (lia-se como scrim).
+       Mesmo valor que o Hypr.AI — os dois partilham a regra de vidro. */
+    bg0:        #0D0D1099;   /* Fundo da janela (vidro funcional, 60%) */
     bg1:        #1C1C21E6;   /* Elevação — inputbar, badges, chips de ícone (90%) */
     bg2:        #18181C99;   /* Agrupamento secundário — categorias/mensagens (~60%) */
     bg3:        #A18DEEF2;   /* Accent — cor de destaque primária (~95%) */

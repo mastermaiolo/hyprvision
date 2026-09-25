@@ -4,7 +4,7 @@
    vidro líquido translúcido calibrado para Wayland/Hyprland.
 
    Camadas:
-   1. Janela: O vidro em si (70% de opacidade sobre o blur do Hyprland).
+   1. Janela: O vidro em si (60% de opacidade sobre o blur do Hyprland).
    2. Conteúdo: Inputbar, agrupamentos e linha selecionada utilizam
       materiais sólidos/semi-sólidos MAIS CLAROS que o vidro (bg1/bg2).
       Essa diferença de tom é o que cria profundidade física sem sujar
@@ -15,7 +15,7 @@
 @import "palette-static.rasi"
 
 * {
-    font:               "SF Pro Text 11";
+    font:               "Inter 11";
     background-color:   transparent;
     text-color:         @fg0;
     margin:             0px;
@@ -24,9 +24,11 @@
 }
 
 window {
-    location:           north;
-    /* Offset vertical calibrado para telas 1080p sob Hyprland */
-    y-offset:           71px;
+    /* Centro: o único padrão que serve a qualquer monitor e barra. Uma
+       posição afinada para um ecrã vai no rofi/user.rasi (nunca apagado
+       pelo install.sh). No rofi 2.0, y-offset não move a janela com
+       location: center — para deslocar, use north + y-offset. */
+    location:           center;
     width:              640px;
 
     /* Apenas a borda superior renderiza para simular incidência real de luz */
@@ -60,7 +62,7 @@ inputbar {
 prompt {
     background-color:   @chip-bg;
     text-color:         @chip-fg;
-    font:               "SF Pro Text Semibold 12";
+    font:               "Inter Semibold 12";
     border-radius:      999px;   /* Formato de pílula / cápsula */
     padding:            6px 14px;
 }
@@ -69,7 +71,7 @@ entry {
     placeholder:        "Buscar...";
     placeholder-color:  @fg2;
     text-color:         @fg0;
-    font:               "SF Pro Text 13";
+    font:               "Inter 13";
     padding:            6px 4px;
 }
 
@@ -83,7 +85,7 @@ message {
 textbox {
     padding:            10px 14px;
     text-color:         @fg2;
-    font:               "SF Pro Text 10";
+    font:               "Inter 10";
 }
 
 listview {

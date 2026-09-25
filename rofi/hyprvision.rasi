@@ -15,11 +15,6 @@
     chip-bg:    #55A3F224;
 }
 
-window {
-    /* 71px = Centro visado 449px (561 - 112) menos metade da altura da janela */
-    y-offset:   71px;
-}
-
 entry {
     placeholder: "pesquisar perfil...";
 }

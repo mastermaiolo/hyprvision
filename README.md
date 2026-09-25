@@ -60,7 +60,7 @@ git clone https://github.com/mastermaiolo/hyprvision && cd hyprvision
 
 The installer is interactive (English or 中文, based on the system locale) and, on a from-scratch install, also:
 - checks for rofi, wl-gammarelay-rs and libnotify, and offers to install whatever's missing (pacman/apt/dnf; AUR via paru/yay for wl-gammarelay-rs);
-- if `Super+H` or `Super+Shift+H` are already bound to something else, lets you pick a different key;
+- if `Super+H` or `Super+Shift+H` are already bound to something else, lets you pick a different key (checking that one too); with no terminal to ask, it leaves that keybind out instead of creating a duplicate, and says where to set one;
 - asks whether you want to switch profiles manually or automatically by time of day (one day profile, one night profile).
 
 After that, it copies everything to `~/.config/hypr/hyprvision`, adds `require("init")` to `hyprland.lua` (or to `~/.config/hypr/user.lua` when that file already exists, so the require survives a modular setup's own config updates — e.g. Ryoku) and reloads Hyprland — it's active right away. Running it again updates without asking again or losing `config.lua` or state.
@@ -91,6 +91,14 @@ The current state is always readable at `~/.config/hypr/hyprvision/state/state` 
 - `battery.restore_after_low` — on recovering from low battery, automatically returns to whichever profile was active
 - `schedule.apply_on_start` — defaults to `false`: startup respects your last profile; schedules only fire once the clock crosses a slot
 - Slots accept `minute` in addition to `hour`
+- A key set to `""` (empty) means no keybind for that action
+
+The menu opens centred. To move it or tweak the theme (width, font…), create `~/.config/hypr/hyprvision/rofi/user.rasi` — applied last, and never touched by the installer:
+
+```css
+/* ~/.config/hypr/hyprvision/rofi/user.rasi */
+window { location: north; y-offset: 120px; }
+```
 
 ## Creating a profile
 

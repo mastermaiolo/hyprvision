@@ -509,6 +509,121 @@ function T.test_nomes_de_perfil_traduzidos()
     assert(en:match("Night"), "locale en devia manter o nome original:\n" .. en)
 end
 
+-- ── install/uninstall: o que é do utilizador fica ─────────────────────
+-- Sandbox com HOME e todas as XDG_* apontadas para dentro dela (uma XDG_*
+-- herdada do ambiente real fazia os rm -rf do uninstall atingirem dados do
+-- utilizador). hyprctl_body: corpo do hyprctl falso (omissão: exit 0).
+local function sandbox(name, hyprctl_body)
+    local sand = TMP .. "/" .. name
+    os.execute(("rm -rf '%s'; mkdir -p '%s/home/.config/hypr' '%s/fakebin'"):format(sand, sand, sand))
+    os.execute(("touch '%s/home/.config/hypr/hyprland.lua'"):format(sand))
+    for _, b in ipairs({ "rofi", "wl-gammarelay-rs", "notify-send", "paru" }) do
+        local fk = assert(io.open(sand .. "/fakebin/" .. b, "w"))
+        fk:write("#!/usr/bin/env bash\nexit 0\n"); fk:close()
+    end
+    local fk = assert(io.open(sand .. "/fakebin/hyprctl", "w"))
+    fk:write("#!/usr/bin/env bash\n" .. (hyprctl_body or "exit 0") .. "\n"); fk:close()
+    os.execute(("chmod +x '%s/fakebin/'*"):format(sand))
+    local env = ("PATH='%s/fakebin':$PATH HYPRLAND_INSTANCE_SIGNATURE= LANG=en_GB.UTF-8 " ..
+                 "HOME='%s/home' XDG_STATE_HOME='%s/home/.local/state' " ..
+                 "XDG_CONFIG_HOME='%s/home/.config' XDG_CACHE_HOME='%s/home/.cache' " ..
+                 "XDG_RUNTIME_DIR='%s/run'"):format(sand, sand, sand, sand, sand, sand)
+    return sand, env
+end
+
+local function slurp(p) local f = assert(io.open(p)); local s = f:read("*a"); f:close(); return s end
+local function spit(p, s) local f = assert(io.open(p, "w")); f:write(s); f:close() end
+local function count(s, pat) local n = 0; for _ in s:gmatch(pat) do n = n + 1 end; return n end
+
+local function run_install(sand, env, extra_env)
+    return os.execute(("printf '1\\n' | %s %s bash '%s/install.sh' >'%s/out.log' 2>&1")
+                      :format(env, extra_env or "", ROOT, sand))
+end
+local function run_uninstall(sand, env)
+    return os.execute(("%s bash '%s/uninstall.sh' >'%s/out.log' 2>&1"):format(env, ROOT, sand))
+end
+
+function T.test_uninstall_preserva_linhas_do_utilizador()
+    local sand, env = sandbox("preserva")
+    local hyprlua = sand .. "/home/.config/hypr/hyprland.lua"
+    -- um require("init") e um comentário que são do utilizador, mais um
+    -- bloco sem marcadores de uma instalação v5.1 (formato antigo)
+    spit(hyprlua, table.concat({
+        'require("config.binds")',
+        '-- nota minha: o hyprvision fica no fim',
+        'require("init")',
+        '-- HyprVision 5',
+        'package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/hypr/hyprvision/?.lua"',
+        'require("init")', "" }, "\n"))
+    assert(run_install(sand, env), "install.sh saiu com erro:\n" .. slurp(sand .. "/out.log"))
+    local mid = slurp(hyprlua)
+    assert(count(mid, "%-%- HyprVision >>>") == 1, "devia haver um só bloco com marcadores:\n" .. mid)
+    assert(not mid:match("%-%- HyprVision 5"), "o bloco antigo devia ter saído:\n" .. mid)
+
+    assert(run_uninstall(sand, env), "uninstall.sh saiu com erro:\n" .. slurp(sand .. "/out.log"))
+    local after = slurp(hyprlua)
+    assert(after == 'require("config.binds")\n-- nota minha: o hyprvision fica no fim\nrequire("init")\n',
+           "só as linhas do HyprVision deviam ter saído — ficou:\n" .. after)
+end
+
+function T.test_install_mantem_symlink_do_hyprland_lua()
+    local sand, env = sandbox("symlink")
+    local hyprlua = sand .. "/home/.config/hypr/hyprland.lua"
+    os.execute(("mkdir -p '%s/dotfiles' && rm -f '%s' && printf 'require(\"config.binds\")\\n' > '%s/dotfiles/hyprland.lua' && ln -s '%s/dotfiles/hyprland.lua' '%s'")
+               :format(sand, hyprlua, sand, sand, hyprlua))
+    assert(run_install(sand, env), "install.sh saiu com erro")
+    assert(os.execute(("test -L '%s'"):format(hyprlua)), "hyprland.lua devia continuar symlink após o install")
+    assert(slurp(sand .. "/dotfiles/hyprland.lua"):match("HyprVision >>>"),
+           "o require devia ter caído no ficheiro real dos dotfiles")
+    assert(run_uninstall(sand, env), "uninstall.sh saiu com erro")
+    assert(os.execute(("test -L '%s'"):format(hyprlua)), "hyprland.lua devia continuar symlink após o uninstall")
+    assert(slurp(sand .. "/dotfiles/hyprland.lua") == 'require("config.binds")\n',
+           "o ficheiro real devia voltar ao original")
+end
+
+function T.test_reinstall_preserva_user_rasi()
+    local sand, env = sandbox("user_rasi")
+    assert(run_install(sand, env), "install.sh saiu com erro")
+    local ur = sand .. "/home/.config/hypr/hyprvision/rofi/user.rasi"
+    spit(ur, "window { location: north; y-offset: 71px; }\n")
+    assert(run_install(sand, env), "segundo install.sh saiu com erro")
+    local f = io.open(ur)
+    assert(f, "rofi/user.rasi foi apagado pela reinstalação (rsync --delete)")
+    assert(f:read("*a"):match("y%-offset: 71px"), "rofi/user.rasi mudou na reinstalação"); f:close()
+end
+
+function T.test_install_tecla_ocupada_sem_terminal_nao_duplica()
+    -- SUPER+H já está ocupado; SUPER+SHIFT+H está livre
+    local sand, env = sandbox("conflito", [==[
+if [[ "$1" == "-j" && "$2" == "binds" ]]; then
+    printf '[\n{\n    "modmask": 64,\n    "key": "H",\n}\n]\n'
+fi
+exit 0]==])
+    assert(run_install(sand, env, "HYPRLAND_INSTANCE_SIGNATURE=fake"),
+           "install.sh saiu com erro:\n" .. slurp(sand .. "/out.log"))
+    local cfg = slurp(sand .. "/home/.config/hypr/hyprvision/config.lua")
+    assert(cfg:match('menu%s*=%s*""'), "sem terminal, a tecla ocupada devia ficar vazia:\n" .. cfg)
+    assert(cfg:match('reset%s*=%s*"SUPER %+ SHIFT %+ H"'), "a tecla livre devia ficar como estava")
+    assert(slurp(sand .. "/out.log"):match("not bound"), "devia avisar que o atalho não foi criado")
+
+    -- e o init.lua não cria bind para a tecla vazia
+    local probe = sand .. "/probe.lua"
+    spit(probe, [[
+local binds = {}
+hl = { config = function() end, monitor = function() end, exec_cmd = function() end,
+       timer = function() end, bind = function(k) binds[#binds + 1] = k end,
+       dsp = { exec_cmd = function(c) return c end }, notification = { create = function() end },
+       get_monitors = function() return {} end }
+dofile(os.getenv("HOME") .. "/.config/hypr/hyprvision/init.lua")
+io.write(table.concat(binds, "|"))
+]])
+    -- cd para a sandbox: o "./?.lua" do package.path vem antes do BASE, e a
+    -- partir do repositório o require("config") apanhava o config.lua dele
+    local p = assert(io.popen(("cd '%s' && HOME='%s/home' lua5.4 '%s' 2>&1"):format(sand, sand, probe)))
+    local out = p:read("*a"); p:close()
+    assert(out == "SUPER + SHIFT + H", "o init.lua devia criar só o bind do reset — criou: " .. out)
+end
+
 -- runner
 local names = {}
 for k in pairs(T) do names[#names+1] = k end

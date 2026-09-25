@@ -9,7 +9,7 @@
    vira `bg1`, a camada de conteúdo elevada sobre o vidro; é essa diferença
    de tom, não sombra, que dá profundidade ao vidro.
 
-   Os alphas (B3 = 70%, E6 = 90%, 99 = 60%) são o que faz o vidro
+   Os alphas (99 = 60%, E6 = 90%, 99 = 60%) são o que faz o vidro
    aparecer: acima de ~85% no fundo, o blur do compositor deixa de
    contribuir e o painel lê como tinta chapada. Ver DESIGN.md.
 
@@ -17,7 +17,7 @@
    duas ferramentas partilham o sistema visual de propósito.
    ══════════════════════════════════════════════════════════════════════ */
 * {
-    bg0:        {{colors.background.default.hex}}B3;
+    bg0:        {{colors.background.default.hex}}99;
     bg1:        {{colors.surface_container_high.default.hex}}E6;
     bg2:        {{colors.surface_container.default.hex}}99;
     bg3:        {{colors.primary.default.hex}}F2;

@@ -18,7 +18,8 @@ declare -A T=(
     [en:files_copied]="✓ Files installed to %s (config.lua and state/ kept)"     [zh:files_copied]="✓ 文件已安装到 %s（保留 config.lua 和 state/）"
     [en:require_ok]="✓ require added to %s"                                     [zh:require_ok]="✓ 已在 %s 中添加 require"
     [en:reloaded]="✓ Hyprland reloaded — HyprVision is active"                  [zh:reloaded]="✓ Hyprland 已重新加载 — HyprVision 已启用"
-    [en:done]="── Done. Menu: %s · Reset: %s ──"                                 [zh:done]="── 完成。菜单：%s · 重置：%s ──"
+    [en:finished]="── Done. Menu: %s · Reset: %s ──"                             [zh:finished]="── 完成。菜单：%s · 重置：%s ──"
+    [en:no_key]="(no keybind)"                                                   [zh:no_key]="（无快捷键）"
 
     [en:noctalia_ok]="✓ Tonal colour bridge registered with Noctalia"           [zh:noctalia_ok]="✓ 已在 Noctalia 中注册色调桥接"
     [en:noctalia_found]="✓ Tonal colour bridge already registered with Noctalia" [zh:noctalia_found]="✓ Noctalia 中已注册色调桥接"
@@ -31,7 +32,10 @@ declare -A T=(
     [zh:glass_manual]="请手动将以下内容添加到 Hyprland 配置中以获得真正的玻璃效果："
 
     [en:bind_conflict]="⚠ %s is already bound to something else."              [zh:bind_conflict]="⚠ %s 已经被绑定到别的功能。"
-    [en:bind_prompt]="  New key to use instead (one letter, Enter keeps %s): "  [zh:bind_prompt]="  改用哪个键？（一个字母，回车保持 %s）："
+    [en:bind_prompt]="  New key (one letter or digit; Enter = no keybind): "   [zh:bind_prompt]="  改用哪个键？（一个字母或数字；回车 = 不设快捷键）："
+    [en:bind_invalid]="  Invalid key — use one letter or digit."              [zh:bind_invalid]="  无效的键 — 请用一个字母或数字。"
+    [en:bind_skip]="→ %s not bound, so as not to duplicate a key already in use. Set a free one in %s (keys.%s)." \
+    [zh:bind_skip]="→ 为避免与已占用的键重复，未绑定 %s。请在 %s 中设置一个空闲的键（keys.%s）。"
 
     [en:deps_title]="Checking dependencies..."                                  [zh:deps_title]="正在检查依赖..."
     [en:dep_missing]="⚠ Missing: %s (%s)"                                       [zh:dep_missing]="⚠ 缺少：%s（%s）"
@@ -57,12 +61,51 @@ declare -A T=(
     [en:schedule_set]="✓ Schedule set: %s at %02d:00, %s at %02d:00"            [zh:schedule_set]="✓ 日程已设置：%s 于 %02d:00，%s 于 %02d:00"
     [en:manual_set]="✓ Manual mode — automatic schedule left disabled"          [zh:manual_set]="✓ 手动模式 — 自动日程保持关闭"
 )
+# shellcheck disable=SC2059  # o formato É a tradução (leva %s)
 t() { local key="$1"; shift; printf -- "${T[$L:$key]}" "$@"; }
+say() { t "$@"; echo; }
 
-echo "$(t title)"
+# Escreve por cima do conteúdo em vez de mv/sed -i: um arquivo que seja
+# symlink (stow, repositório de dotfiles) continua symlink, e a mudança cai
+# no arquivo real em vez de o substituir por uma cópia solta.
+write_through() {   # $1=arquivo  stdin=conteúdo novo
+    local tmp; tmp="$(mktemp)"
+    cat > "$tmp" && cat "$tmp" > "$1"
+    rm -f "$tmp"
+}
+
+# Tira do arquivo só o que o instalador lá pôs: o bloco entre
+# "-- HyprVision >>>" e "-- HyprVision <<<" e, de instalações v5.0/v5.1
+# (sem marcadores), exatamente as três linhas consecutivas que elas
+# escreviam. Antes era sed '/hyprvision/d' + '/require("init")/d': levava
+# também qualquer comentário do utilizador com a palavra e qualquer
+# require("init") dele — um módulo "init" próprio deixava de carregar.
+strip_hyprvision() {   # $1=arquivo
+    [[ -f "$1" ]] || return 0
+    awk '
+        { line[++n] = $0 }
+        END {
+            for (i = 1; i <= n; i++) {
+                if (line[i] ~ /^-- HyprVision >>>[[:space:]]*$/) {
+                    while (i <= n && line[i] !~ /^-- HyprVision <<<[[:space:]]*$/) i++
+                    continue
+                }
+                if (line[i] ~ /^-- HyprVision( 5)?[[:space:]]*$/ \
+                    && line[i+1] ~ /^package\.path = .*\/\.config\/hypr\/hyprvision\/\?\.lua"\)?[[:space:]]*$/ \
+                    && line[i+2] ~ /^require\("(init|hyprvision_lua)"\)[[:space:]]*$/) {
+                    i += 2
+                    continue
+                }
+                print line[i]
+            }
+        }
+    ' "$1" | write_through "$1"
+}
+
+say title
 [[ -f "$HYPRLUA" ]] || {
-    echo "$(t no_hyprlua "$HYPRLUA")"
-    echo "$(t no_hyprlua_hint)"
+    say no_hyprlua "$HYPRLUA"
+    say no_hyprlua_hint
     exit 1
 }
 
@@ -85,13 +128,13 @@ pkg_name() {   # nome do pacote da dependência lógica ($1) neste gestor
 install_pkg() {   # $1 = dependência lógica (rofi, libnotify)
     local pkg; pkg="$(pkg_name "$1")"
     if [[ -z "$PKG_MGR" || -z "$pkg" ]]; then
-        echo "$(t no_pkg_mgr "$1")"; return
+        say no_pkg_mgr "$1"; return
     fi
     local ans
     printf '%s' "$(t ask_install "$pkg")" >&2
     if read -r ans; then ans="${ans:-Y}"; else ans="N"; fi
     [[ "$ans" =~ ^[Yy] ]] || return
-    echo "$(t installing "$pkg")"
+    say installing "$pkg"
     $PKG_INSTALL "$pkg"
 }
 
@@ -100,7 +143,7 @@ install_wl_gammarelay() {
     command -v paru &>/dev/null && aur=paru
     [[ -z "$aur" ]] && command -v yay &>/dev/null && aur=yay
     if [[ -z "$aur" ]]; then
-        echo "$(t aur_needed "wl-gammarelay-rs")"
+        say aur_needed "wl-gammarelay-rs"
         echo "  https://github.com/MaxVerevkin/wl-gammarelay-rs"
         return
     fi
@@ -108,21 +151,21 @@ install_wl_gammarelay() {
     printf '%s' "$(t ask_install "wl-gammarelay-rs")" >&2
     if read -r ans; then ans="${ans:-Y}"; else ans="N"; fi
     [[ "$ans" =~ ^[Yy] ]] || return
-    echo "$(t installing "wl-gammarelay-rs")"
+    say installing "wl-gammarelay-rs"
     "$aur" -S --noconfirm wl-gammarelay-rs
 }
 
 check_and_offer() {   # $1=comando a testar  $2=dependência lógica  $3=required|recommended
     command -v "$1" &>/dev/null && return 0
-    echo "$(t dep_missing "$1" "$(t "dep_$3")")"
+    say dep_missing "$1" "$(t "dep_$3")"
     if [[ "$2" == wl-gammarelay-rs ]]; then install_wl_gammarelay; else install_pkg "$2"; fi
 }
 
-echo; echo "$(t deps_title)"
+echo; say deps_title
 check_and_offer rofi rofi required
 check_and_offer wl-gammarelay-rs wl-gammarelay-rs recommended
 check_and_offer notify-send libnotify recommended
-echo "$(t dep_ok)"
+say dep_ok
 
 # daemon v4 ainda a correr? pára-o
 pkill -f hyprvision-daemon 2>/dev/null || true
@@ -132,7 +175,7 @@ rsync -a --delete \
     --exclude 'state/' --exclude '.git/' --exclude 'docs/' --exclude 'assets/' \
     --exclude 'install.sh' --exclude 'uninstall.sh' \
     --exclude 'test_hyprvision.lua' --exclude 'README*.md' --exclude 'CHANGELOG.md' \
-    --exclude 'config.lua' \
+    --exclude 'config.lua' --exclude 'rofi/user.rasi' \
     "$SRC"/ "$DEST"/
 chmod +x "$DEST/ui/launcher.sh"
 CONFIG_IS_NEW=0
@@ -140,7 +183,7 @@ if [[ ! -f "$DEST/config.lua" ]]; then
     cp "$SRC/config.lua" "$DEST/config.lua"
     CONFIG_IS_NEW=1
 fi
-echo "$(t files_copied "$DEST")"
+say files_copied "$DEST"
 
 # ── atalhos: só verifica conflitos numa instalação de raiz, e só dentro
 #    de uma sessão Hyprland viva (hyprctl binds precisa do compositor) ───
@@ -170,7 +213,7 @@ disable_schedule() {   # só desliga schedule.enabled — não toca em battery.e
         /^    schedule = \{$/ { in_sched = 1 }
         in_sched && /^        enabled = true,$/ { sub(/true/, "false"); in_sched = 0 }
         { print }
-    ' "$DEST/config.lua" > "$DEST/config.lua.tmp" && mv "$DEST/config.lua.tmp" "$DEST/config.lua"
+    ' "$DEST/config.lua" | write_through "$DEST/config.lua"
 }
 
 apply_schedule() {   # $1=id dia $2=hora dia $3=id noite $4=hora noite
@@ -185,7 +228,7 @@ apply_schedule() {   # $1=id dia $2=hora dia $3=id noite $4=hora noite
         in_slots { next }
         /^        apply_on_start = false,/ { sub(/false/, "true"); print; next }
         { print }
-    ' "$DEST/config.lua" > "$DEST/config.lua.tmp" && mv "$DEST/config.lua.tmp" "$DEST/config.lua"
+    ' "$DEST/config.lua" | write_through "$DEST/config.lua"
 }
 
 ask_profile_number() {   # $1=chave do prompt → id escolhido, ou "" se não houver resposta
@@ -196,7 +239,7 @@ ask_profile_number() {   # $1=chave do prompt → id escolhido, ou "" se não ho
             IFS='|' read -r id _ <<< "${PROFILES[n-1]}"
             echo "$id"; return
         fi
-        echo "$(t bad_number)" >&2
+        say bad_number >&2
         printf '%s' "$(t "$1")" >&2; read -r n || { echo ""; return; }
     done
 }
@@ -206,41 +249,63 @@ ask_hour() {   # $1=chave do prompt → hora escolhida, ou "" se não houver res
     printf '%s' "$(t "$1")" >&2; read -r h || { echo ""; return; }
     while true; do
         [[ "$h" =~ ^[0-9]+$ ]] && (( h >= 0 && h <= 23 )) && { echo "$h"; return; }
-        echo "$(t bad_hour)" >&2
+        say bad_hour >&2
         printf '%s' "$(t "$1")" >&2; read -r h || { echo ""; return; }
     done
 }
 
 if (( CONFIG_IS_NEW )); then
     if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-        MENU_KEY=H; RESET_KEY=H
-        if bind_taken 64 "$MENU_KEY"; then
-            echo; echo "$(t bind_conflict "SUPER + $MENU_KEY")"
-            NEW=""; printf '%s' "$(t bind_prompt "$MENU_KEY")" >&2; read -r NEW || true
-            [[ -n "$NEW" ]] && MENU_KEY="${NEW:0:1}" && MENU_KEY="${MENU_KEY^^}"
-        fi
-        if bind_taken 65 "$RESET_KEY"; then
-            echo; echo "$(t bind_conflict "SUPER + SHIFT + $RESET_KEY")"
-            NEW=""; printf '%s' "$(t bind_prompt "$RESET_KEY")" >&2; read -r NEW || true
-            [[ -n "$NEW" ]] && RESET_KEY="${NEW:0:1}" && RESET_KEY="${RESET_KEY^^}"
-        fi
-        [[ "$MENU_KEY" != "H" ]] && sed -i "s/menu  = \"SUPER + H\"/menu  = \"SUPER + ${MENU_KEY}\"/" "$DEST/config.lua"
-        [[ "$RESET_KEY" != "H" ]] && sed -i "s/reset = \"SUPER + SHIFT + H\"/reset = \"SUPER + SHIFT + ${RESET_KEY}\"/" "$DEST/config.lua"
+        # Uma tecla por vez: se a padrão estiver ocupada, pergunta até haver
+        # uma livre (verificando cada uma). Sem terminal, ou Enter vazio, a
+        # tecla fica "" e o init.lua não cria esse bind — duplicar em
+        # silêncio (a tecla passava a fazer duas coisas) é pior que não ter.
+        pick_key() {   # $1=modmask $2=rótulo "SUPER" ou "SUPER + SHIFT" → tecla livre, ou ""
+            local key=H new
+            while bind_taken "$1" "$key"; do
+                echo >&2; say bind_conflict "$2 + $key" >&2
+                new=""
+                while [[ -t 0 ]]; do
+                    printf '%s' "$(t bind_prompt)" >&2
+                    read -r new || new=""
+                    [[ -z "$new" || "$new" =~ ^[[:alnum:]]$ ]] && break
+                    say bind_invalid >&2
+                done
+                [[ -z "$new" ]] && { echo ""; return; }
+                key="${new^^}"
+            done
+            echo "$key"
+        }
+        set_key() {   # $1=menu|reset  $2=prefixo  $3=tecla (vazia = sem bind)
+            local val=""; [[ -n "$3" ]] && val="$2 + $3"
+            awk -v k="$1" -v v="$val" '
+                !done && $0 ~ "^[[:space:]]*" k "[[:space:]]*=[[:space:]]*\"" {
+                    sub(/"[^"]*"/, "\"" v "\""); done = 1
+                }
+                { print }' "$DEST/config.lua" | write_through "$DEST/config.lua"
+        }
+        MENU_KEY="$(pick_key 64 SUPER)"
+        RESET_KEY="$(pick_key 65 "SUPER + SHIFT")"
+        # `if`, nunca `[[ ]] &&` no fim de bloco: regressão set -e da v4.1.0
+        if [[ "$MENU_KEY" != "H" ]]; then set_key menu "SUPER" "$MENU_KEY"; fi
+        if [[ "$RESET_KEY" != "H" ]]; then set_key reset "SUPER + SHIFT" "$RESET_KEY"; fi
+        if [[ -z "$MENU_KEY" ]]; then say bind_skip "SUPER + H" "$DEST/config.lua" menu; fi
+        if [[ -z "$RESET_KEY" ]]; then say bind_skip "SUPER + SHIFT + H" "$DEST/config.lua" reset; fi
     fi
 
-    echo; echo "$(t mode_title)"
+    echo; say mode_title
     echo "  1) $(t mode_manual)"
     echo "  2) $(t mode_auto)"
     MODE=1
     while true; do
         printf '%s' "$(t pick_mode)" >&2; read -r MODE || { MODE=1; break; }
         [[ "$MODE" == "1" || "$MODE" == "2" ]] && break
-        echo "$(t bad_number)" >&2
+        say bad_number >&2
     done
 
     if [[ "$MODE" == "2" ]]; then
         mapfile -t PROFILES < <(list_profiles)
-        echo "$(t profiles_list)"
+        say profiles_list
         i=1
         for p in "${PROFILES[@]}"; do
             IFS='|' read -r _ name <<< "$p"
@@ -254,14 +319,14 @@ if (( CONFIG_IS_NEW )); then
 
         if [[ -n "${NIGHT_HOUR:-}" ]]; then
             apply_schedule "$DAY_ID" "$DAY_HOUR" "$NIGHT_ID" "$NIGHT_HOUR"
-            echo "$(t schedule_set "$DAY_ID" "$DAY_HOUR" "$NIGHT_ID" "$NIGHT_HOUR")"
+            say schedule_set "$DAY_ID" "$DAY_HOUR" "$NIGHT_ID" "$NIGHT_HOUR"
         else
             disable_schedule
-            echo "$(t manual_set)"
+            say manual_set
         fi
     else
         disable_schedule
-        echo "$(t manual_set)"
+        say manual_set
     fi
 fi
 
@@ -274,19 +339,19 @@ fi
 WIREFILE="$HYPRLUA"
 [[ -f "$HOME/.config/hypr/user.lua" ]] && WIREFILE="$HOME/.config/hypr/user.lua"
 
-# remove qualquer bloco HyprVision anterior — formato antigo (v4/v5, sem
+# remove qualquer bloco HyprVision anterior — formato antigo (v5.0/v5.1, sem
 # marcadores, só existiu em hyprland.lua) e o novo formato com marcadores
 # (pode estar em hyprland.lua ou em user.lua, conforme uma instalação
 # anterior o tenha posto) — e recria, idempotente
-sed -i -e '/hyprvision/d' -e '/^-- HyprVision/d' -e '/require("init")/d' "$HYPRLUA"
-[[ -f "$WIREFILE" ]] && sed -i -e '/-- HyprVision >>>/,/-- HyprVision <<</d' "$WIREFILE"
+strip_hyprvision "$HYPRLUA"
+if [[ "$WIREFILE" != "$HYPRLUA" ]]; then strip_hyprvision "$WIREFILE"; fi
 cat >> "$WIREFILE" <<'LUA'
 -- HyprVision >>>
 package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/hypr/hyprvision/?.lua"
 require("init")
 -- HyprVision <<<
 LUA
-echo "$(t require_ok "$(basename "$WIREFILE")")"
+say require_ok "$(basename "$WIREFILE")"
 
 # ── cor tonal: registra o template no Noctalia, se instalado ────────────
 # O Noctalia re-renderiza theme/noctalia.rasi.tmpl sozinho a cada troca de
@@ -298,7 +363,7 @@ mkdir -p "$STATE_DIR"
 NOCTALIA_CONF="$HOME/.config/noctalia/config.toml"
 if [[ -f "$NOCTALIA_CONF" ]]; then
     if grep -q "theme.templates.user.hyprvision" "$NOCTALIA_CONF" 2>/dev/null; then
-        echo "$(t noctalia_found)"
+        say noctalia_found
     else
         cat >> "$NOCTALIA_CONF" <<EOF
 
@@ -306,7 +371,7 @@ if [[ -f "$NOCTALIA_CONF" ]]; then
     input_path = "$DEST/theme/noctalia.rasi.tmpl"
     output_path = "$STATE_DIR/noctalia-colors.rasi"
 EOF
-        echo "$(t noctalia_ok)"
+        say noctalia_ok
     fi
 fi
 
@@ -319,7 +384,7 @@ GLASS_RULE='hl.layer_rule({ name = "rofi-glass", match = { namespace = "^rofi$" 
 WINDOWRULES="$HOME/.config/hypr/config/windowrules.lua"
 if [[ -f "$WINDOWRULES" ]]; then
     if grep -q 'namespace = "\^rofi\$"' "$WINDOWRULES" 2>/dev/null; then
-        echo "$(t glass_found)"
+        say glass_found
     elif [[ -t 0 ]]; then
         read -r -p "$(t glass_ask)" GLASS_ANS
         case "$GLASS_ANS" in
@@ -337,22 +402,22 @@ hl.layer_rule({
   xray = false,
 })
 EOF
-                echo "$(t glass_ok)"
+                say glass_ok
                 ;;
-            *) echo "$(t glass_skip)" ;;
+            *) say glass_skip ;;
         esac
     else
-        echo "$(t glass_manual)"
+        say glass_manual
         printf '%s\n' "$GLASS_RULE"
     fi
 else
-    echo "$(t glass_manual)"
+    say glass_manual
     printf '%s\n' "$GLASS_RULE"
 fi
 
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-    hyprctl reload >/dev/null && echo "$(t reloaded)"
+    hyprctl reload >/dev/null && say reloaded
 fi
-FINAL_MENU="$(grep -m1 'menu  =' "$DEST/config.lua" | sed -E 's/.*"([^"]+)".*/\1/')"
-FINAL_RESET="$(grep -m1 'reset =' "$DEST/config.lua" | sed -E 's/.*"([^"]+)".*/\1/')"
-echo "$(t done "$FINAL_MENU" "$FINAL_RESET")"
+FINAL_MENU="$(grep -m1 'menu  =' "$DEST/config.lua" | sed -E 's/.*"([^"]*)".*/\1/')"
+FINAL_RESET="$(grep -m1 'reset =' "$DEST/config.lua" | sed -E 's/.*"([^"]*)".*/\1/')"
+say finished "${FINAL_MENU:-$(t no_key)}" "${FINAL_RESET:-$(t no_key)}"

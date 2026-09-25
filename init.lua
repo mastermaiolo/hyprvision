@@ -36,8 +36,15 @@ _G.hv = {
 -- render p/ painel 8-bit: curvas em fp16 interno + VCGT ICC por KMS
 hl.config({ render = { use_fp16 = true, icc_vcgt_enabled = true } })
 
-hl.bind(cfg.keys.menu,  hl.dsp.exec_cmd(BASE .. "/ui/launcher.sh"))
-hl.bind(cfg.keys.reset, _G.hv.safe_reset)
+-- Tecla vazia ("") = sem atalho: o install.sh deixa-a assim quando a
+-- combinação padrão já estava ocupada e não havia a quem perguntar outra —
+-- um bind duplicado faria a tecla disparar duas acções.
+if cfg.keys.menu ~= "" then
+    hl.bind(cfg.keys.menu, hl.dsp.exec_cmd(BASE .. "/ui/launcher.sh"))
+end
+if cfg.keys.reset ~= "" then
+    hl.bind(cfg.keys.reset, _G.hv.safe_reset)
+end
 
 core.write_menu_index()
 

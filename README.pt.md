@@ -60,7 +60,7 @@ git clone https://github.com/mastermaiolo/hyprvision && cd hyprvision
 
 O instalador é interativo (inglês ou 中文, conforme o locale do sistema) e, numa instalação de raiz, também:
 - verifica rofi, wl-gammarelay-rs e libnotify, e oferece-se para instalar o que faltar (pacman/apt/dnf; AUR via paru/yay para o wl-gammarelay-rs);
-- se `Super+H` ou `Super+Shift+H` já estiverem ocupados por outro atalho, deixa escolher uma tecla diferente;
+- se `Super+H` ou `Super+Shift+H` já estiverem ocupados por outro atalho, deixa escolher uma tecla diferente (verificando também essa); sem terminal para perguntar, não cria esse atalho em vez de o duplicar, e diz onde definir um;
 - pergunta se queres trocar de perfil manualmente ou automaticamente por horário (um perfil de dia, outro de noite).
 
 Depois disso, copia para `~/.config/hypr/hyprvision`, acrescenta o `require("init")` ao `hyprland.lua` (ou a `~/.config/hypr/user.lua` quando esse ficheiro já existe, para o require sobreviver a updates de configuração de setups modulares — ex. Ryoku) e recarrega o Hyprland — fica logo activo. Correr de novo actualiza sem voltar a perguntar nem perder `config.lua` ou estado.
@@ -91,6 +91,14 @@ O estado actual está sempre legível em `~/.config/hypr/hyprvision/state/state`
 - `battery.restore_after_low` — ao recuperar de bateria fraca, volta sozinho ao perfil que estava activo
 - `schedule.apply_on_start` — por omissão `false`: o arranque respeita o teu último perfil; os horários só disparam quando a hora cruza um slot
 - Slots aceitam `minute` além de `hour`
+- Uma tecla definida como `""` (vazia) significa sem atalho para essa acção
+
+O menu abre centrado. Para o mudar de sítio ou ajustar o tema (largura, fonte…), cria `~/.config/hypr/hyprvision/rofi/user.rasi` — aplicado por último, e nunca tocado pelo instalador:
+
+```css
+/* ~/.config/hypr/hyprvision/rofi/user.rasi */
+window { location: north; y-offset: 120px; }
+```
 
 ## Criar um perfil
 
