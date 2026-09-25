@@ -13,6 +13,7 @@ Port das correções feitas no Hypr.AI (v1.1.0) para a camada que os dois partil
 - **Reinstalar apagava o `rofi/user.rasi`** (o `rsync --delete` não o excluía).
 
 ### Alterado
+- **Emojis dos perfis sem caixa atrás**: iam no texto com um fundo (`<span background>`) que se lia como uma caixa, sobretudo num esquema claro. Passam a ser PNG na coluna de ícone do rofi, gerados uma vez pelo `pango-view` em `~/.cache/hyprvision/emoji` — como no Hypr.AI.
 - **Vidro a 60%** (era 70%), **fonte Inter** (era SF Pro Text) e **janela centrada** por omissão — iguais ao Hypr.AI. Uma posição afinada à mão vai para `rofi/user.rasi`, aplicado por último.
 - **Cabeçalhos de secção** passam como `nonselectable`: o Enter num cabeçalho já não reabre o menu (as setas continuam a parar neles — limitação do dmenu do rofi).
 - **`uninstall.sh` em en/pt/zh**, com o mesmo critério de locale do launcher.

@@ -96,6 +96,6 @@ fi
 
 rm -rf "$DEST"
 rm -rf "${XDG_RUNTIME_DIR:-/tmp}/hyprvision"
-rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/hyprvision"
+rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/hyprvision" "${XDG_CACHE_HOME:-$HOME/.cache}/hyprvision"
 say removed "$DEST"
 say finished

@@ -243,7 +243,32 @@ edit_config() {
 ROW_TEXT=()
 ROW_ID=()
 
-row() { ROW_TEXT+=("$1"); ROW_ID+=("${2:-}"); }
+ROW_ICON=()
+row() { ROW_TEXT+=("$1"); ROW_ID+=("${2:-}"); ROW_ICON+=("${3:-}"); }
+
+# O emoji vai para a coluna de ícone do rofi, não para o texto: no texto
+# levava um <span background> que se lia como uma caixa atrás de cada
+# emoji (sobretudo num esquema claro). O librsvg desenha emoji a preto
+# chapado, por isso vira PNG pelo pango-view (vem com o pango, de que o
+# próprio rofi depende), uma vez só, em cache — como no Hypr.AI.
+EMOJI_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/hyprvision/emoji"
+emoji_icon() {   # $1=emoji → caminho do PNG em cache
+    local key out
+    [[ -n "$1" ]] && command -v pango-view &>/dev/null || return 1
+    key="$(printf '%s' "$1" | od -An -tx1 | tr -d ' \n')"
+    out="$EMOJI_CACHE/$key.png"
+    if [[ ! -s "$out" ]]; then
+        mkdir -p "$EMOJI_CACHE" || return 1
+        # .tmp.png, não .png.tmp: o pango-view escolhe o formato pela extensão
+        if ! pango-view --no-display -q --background=transparent --margin=0 \
+                --font="Noto Color Emoji 40" --text="$1" -o "$out.tmp.png" &>/dev/null \
+             || ! mv -f "$out.tmp.png" "$out"; then
+            rm -f "$out.tmp.png"
+            return 1
+        fi
+    fi
+    printf '%s' "$out"
+}
 
 # Pango markup: '&' e '<' num nome de perfil partem a linha inteira.
 esc() { printf '%s' "${1//&/&amp;}" | sed 's/</\&lt;/g'; }
@@ -257,12 +282,15 @@ sep() { row "$(printf '<span size="small" weight="600" alpha="45%%" letter_spaci
 item() {
     local icon="$1" name; name="$(esc "$2")"
     local desc="${3:-}" id="${4:-}"
-    local lead; lead="$(printf '<span background="%s"> %s </span>  ' "$CHIP_BG" "$icon")"
+    # Sem pango-view, o emoji fica no texto — mas sem fundo, que é o que
+    # fazia a caixa.
+    local icon_path="" lead=""
+    icon_path="$(emoji_icon "$icon")" || lead="$(esc "$icon")  "
     if [[ -n "$desc" ]]; then
         row "$(printf '%s%s   <span size="small" alpha="50%%">%s</span>' \
-                "$lead" "$name" "$(esc "$desc")")" "$id"
+                "$lead" "$name" "$(esc "$desc")")" "$id" "$icon_path"
     else
-        row "$(printf '%s%s' "$lead" "$name")" "$id"
+        row "$(printf '%s%s' "$lead" "$name")" "$id" "$icon_path"
     fi
 }
 
@@ -314,12 +342,16 @@ run_menu() {
     # nas setas (a opção só impede o Enter), mas o Enter já não reabre o menu.
     local i
     for i in "${!ROW_TEXT[@]}"; do
+        # O NUL do protocolo de ícone só pode nascer aqui, no printf que
+        # escreve direto no pipe — uma variável bash não guarda NUL.
         if [[ -z "${ROW_ID[i]:-}" ]]; then
             printf '%s\x00nonselectable\x1ftrue\n' "${ROW_TEXT[i]}"
+        elif [[ -n "${ROW_ICON[i]:-}" ]]; then
+            printf '%s\x00icon\x1f%s\n' "${ROW_TEXT[i]}" "${ROW_ICON[i]}"
         else
             printf '%s\n' "${ROW_TEXT[i]}"
         fi
-    done | rofi -dmenu -p "$1" -theme "$ROFI_THEME" \
+    done | rofi -dmenu -show-icons -p "$1" -theme "$ROFI_THEME" \
         -theme-str "entry { placeholder: \"$(t search_placeholder)\"; }" \
         "${dyn[@]}" "${usr[@]}" "${mesg[@]}" -no-custom -markup-rows -format i -selected-row "${2:-1}"
 }
@@ -333,7 +365,7 @@ pick() {
 }
 
 build_main() {
-    ROW_TEXT=(); ROW_ID=()
+    ROW_TEXT=(); ROW_ID=(); ROW_ICON=()
     local last_cat="" id icon name cat mark
     while IFS=$'\t' read -r id icon name cat; do
         if [[ "$cat" != "$last_cat" ]]; then
@@ -371,7 +403,7 @@ if [[ -z "$ID" ]]; then exec "$0"; fi
 
 case "$ID" in
     __paper__)
-        ROW_TEXT=(); ROW_ID=(); back_row
+        ROW_TEXT=(); ROW_ID=(); ROW_ICON=(); back_row
         for lvl in off light medium heavy; do
             mark=""; [[ "$lvl" == "$PAPER" ]] && mark="✓"
             item "📄" "$lvl" "$mark" "$lvl"
@@ -381,7 +413,7 @@ case "$ID" in
         hv "overlay('paper', '$SEL')"
         ;;
     __dim__)
-        ROW_TEXT=(); ROW_ID=(); back_row
+        ROW_TEXT=(); ROW_ID=(); ROW_ICON=(); back_row
         for lvl in 0 10 20 30 40 50; do
             mark=""; [[ "$lvl" == "$DIM" ]] && mark="✓"
             item "🔅" "$lvl%" "$mark" "$lvl"
@@ -399,7 +431,7 @@ case "$ID" in
             rofi -e "$(t extras_empty "$EXTRAS_DIR")" -theme "$ROFI_THEME" "${dyn[@]}" || true
             exit 0
         fi
-        ROW_TEXT=(); ROW_ID=(); back_row
+        ROW_TEXT=(); ROW_ID=(); ROW_ICON=(); back_row
         for f in "${EXTRAS[@]}"; do
             mark=""; [[ "$f" == "$EXTRA" ]] && mark="✓"
             item "🌐" "${f%.*}" "$mark" "$f"
