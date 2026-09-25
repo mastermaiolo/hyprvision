@@ -1,6 +1,6 @@
 # Changelog
 
-## Por lançar
+## v5.4.0 — 2026-09-25
 
 Port das correções feitas no Hypr.AI (v1.1.0) para a camada que os dois partilham — launcher Rofi, tema tonal e instalador.
 
@@ -18,6 +18,17 @@ Port das correções feitas no Hypr.AI (v1.1.0) para a camada que os dois partil
 - **Cabeçalhos de secção** passam como `nonselectable`: o Enter num cabeçalho já não reabre o menu (as setas continuam a parar neles — limitação do dmenu do rofi).
 - **`uninstall.sh` em en/pt/zh**, com o mesmo critério de locale do launcher.
 - `shellcheck` sem avisos nos três scripts; 4 testes novos (linhas do utilizador preservadas, symlink, `user.rasi` na reinstalação, tecla ocupada sem terminal → sem bind).
+
+## v5.3.0 — 2026-09-22
+
+Corrige a legibilidade do badge do prompt sob a ponte tonal, evita reconfigurações de monitor desnecessárias, e traz 6 shaders novos do snes19xx.
+
+### Corrigido
+- **Badge do prompt ignorava a ponte tonal**: `text-color` usava `@bg3` (accent bruto) em vez de `@chip-fg` (papel M3 `on_primary_container`), que o Noctalia/Caelestia já calculam com contraste verificado especificamente para ficar legível sobre `@chip-bg`.
+- **`set_icc()` reconfigurava o monitor inteiro em toda troca de overlay**: redeclarava a spec inteira do monitor (sem `transform`/`vrr`/`bitdepth`) mesmo quando o ICC não mudava — risco de resetar rotação/VRR de um monitor externo. Agora cacheia o último ICC aplicado e só reconfigura quando ele muda de facto.
+
+### Adicionado
+- **6 shaders novos do snes19xx**: `amano`, `art_canvas`, `dither`, `greens`, `silent_hill`, `smart_invert` — do repositório upstream [`surface-dots`](https://github.com/snes19xx/surface-dots).
 
 ## v5.2.0 — 2026-09-19
 
